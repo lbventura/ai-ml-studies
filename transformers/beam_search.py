@@ -5,6 +5,7 @@ import string
 # Define the alphabet
 alphabet = string.ascii_lowercase  # For lowercase letters
 
+
 class BeamSearch:
     def __init__(self, beam_width):
         self.beam_width = beam_width
@@ -26,19 +27,27 @@ class BeamSearch:
             # Prune to keep only the top k states
             beam = heapq.nlargest(self.beam_width, all_candidates, key=lambda x: x[0])
 
+
 # Example usage
 def expand_fn(state):
     # Example expansion function: generate next states
     # Pick a random letter from the alphabet
-    return [state + random.choice(alphabet), state + random.choice(alphabet), state + random.choice(alphabet)]
+    return [
+        state + random.choice(alphabet),
+        state + random.choice(alphabet),
+        state + random.choice(alphabet),
+    ]
+
 
 def score_fn(state):
     # Example scoring function: score based on length
     return len(set(state))
 
+
 def end_fn(state):
     # Example end condition: stop if state length is 5
     return len(state) == 36
+
 
 beam_search = BeamSearch(beam_width=3)
 start_state = ""
