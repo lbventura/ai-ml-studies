@@ -32,7 +32,7 @@ bh = np.zeros((hidden_size, 1))  # hidden bias
 by = np.zeros((vocab_size, 1))  # output bias
 
 
-def lossFun(inputs, targets, hprev):
+def loss_fun(inputs, targets, hprev):
     """
     inputs,targets are both list of integers.
     hprev is Hx1 array of initial hidden state
@@ -135,7 +135,7 @@ while True:
             output_txt.write(str(probs))
 
     # forward seq_length characters through the net and fetch gradient
-    loss, dWxh, dWhh, dWhy, dbh, dby, hprev = lossFun(inputs, targets, hprev)
+    loss, dWxh, dWhh, dWhy, dbh, dby, hprev = loss_fun(inputs, targets, hprev)
     smooth_loss = smooth_loss * 0.999 + loss * 0.001
     if n % 100 == 0:
         print("iter %d, loss: %f" % (n, smooth_loss))  # print progress
