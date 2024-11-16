@@ -4,6 +4,9 @@ BSD License
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+current_path = Path(__file__).parent
 
 # data I/O
 data = open('rnn/input.txt', 'r').read().lower() # should be simple plain text file
@@ -107,9 +110,13 @@ while True:
     sample_ix , probs = sample(hprev, inputs[0], 200)
     txt = ''.join(ix_to_char[ix] for ix in sample_ix)
     print('----\n %s \n----' % (txt, ))
-    with open(f'text_{n}.txt', 'w') as output_txt:
+
+    file_store_path = Path(__file__).parent / "run_outputs"
+    file_store_path.mkdir(parents=True, exist_ok=True)
+    name_prefix = f"hs_{hidden_size}_seq_length_{seq_length}"
+    with open(file_store_path / f'{name_prefix}_text_{n}.txt', 'w') as output_txt:
       output_txt.write(txt)
-    with open(f'probs_{n}.txt', 'w') as output_txt:
+    with open(file_store_path / f'{name_prefix}_probs_{n}.txt', 'w') as output_txt:
       output_txt.write(str(probs))
     
 
