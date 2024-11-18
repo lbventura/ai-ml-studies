@@ -32,7 +32,9 @@ bh = np.zeros((hidden_size, 1))  # hidden bias
 by = np.zeros((vocab_size, 1))  # output bias
 
 
-def loss_fun(inputs, targets, hprev):
+def loss_fun(
+    inputs: np.array, targets: np.array, hprev: np.array
+) -> tuple[np.array, np.array, np.array, np.array, np.array, np.array, np.array]:
     """
     inputs,targets are both list of integers.
     hprev is Hx1 array of initial hidden state
@@ -78,7 +80,7 @@ def loss_fun(inputs, targets, hprev):
     return loss, dWxh, dWhh, dWhy, dbh, dby, hs[len(inputs) - 1]
 
 
-def sample(h, seed_ix, n):
+def sample(h: np.array, seed_ix: np.array, n: int) -> tuple[np.array, np.array]:
     """
     sample a sequence of integers from the model
     h is memory state, seed_ix is seed letter for first time step
