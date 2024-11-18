@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 
 
-class UNet(nn.Module):
-    def __init__(self, kernel, num_filters, num_colours, num_in_channels):
+class UNet(nn.Module):  # type: ignore
+    def __init__(
+        self, kernel: int, num_filters: int, num_colours: int, num_in_channels: int
+    ):
         super(UNet, self).__init__()
         padding = kernel // 2
 
@@ -61,7 +63,7 @@ class UNet(nn.Module):
             padding=padding,
         )  # Change the output size from 3 (RBG) to the number of colors
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         self.out1 = self.downconv1(x)
         self.out2 = self.downconv2(self.out1)
         self.out3 = self.rfconv(self.out2)

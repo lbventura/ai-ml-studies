@@ -6,7 +6,7 @@ import numpy.random as npr
 import torch
 import torch.nn as nn
 
-HORSE_CATEGORY = 7
+from cnn.data_types import Categories
 
 
 def get_rgb_cat(xs: np.array, colours: np.array) -> np.array:
@@ -69,7 +69,11 @@ def get_cat_rgb(cats: np.array, colours: np.array) -> np.array:
 
 
 def process(
-    xs: np.array, ys: np.array, max_pixel: float = 256.0, downsize_input: bool = False
+    xs: np.array,
+    ys: np.array,
+    max_pixel: float = 256.0,
+    downsize_input: bool = False,
+    category: Categories = Categories.HORSES,
 ) -> tuple[np.array, np.array]:
     """
     Pre-process CIFAR10 images by taking only the horse category,
@@ -85,7 +89,7 @@ def process(
       grey: greyscale images, also normalized so values are between 0 and 1
     """
     xs = xs / max_pixel
-    xs = xs[np.where(ys == HORSE_CATEGORY)[0], :, :, :]
+    xs = xs[np.where(ys == category.value)[0], :, :, :]
     npr.shuffle(xs)
 
     grey = np.mean(xs, axis=1, keepdims=True)

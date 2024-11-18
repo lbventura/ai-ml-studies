@@ -8,10 +8,7 @@ import torch
 import torch.nn as nn
 from cnn.cnnet import CNN
 from cnn.data_extraction import load_cifar10, load_colors
-from cnn.data_preprocessing import (
-    get_rgb_cat,
-    process,
-)
+from cnn.data_preprocessing import get_rgb_cat, process
 from cnn.training_utils import (
     get_batch,
     get_torch_vars,
@@ -23,25 +20,7 @@ from cnn.training_utils import (
 from cnn.unet import UNet
 
 from pathlib import Path
-from dataclasses import dataclass
-
-
-@dataclass
-class ModelParams:
-    gpu: bool = False
-    valid: bool = False
-    checkpoint: str = ""
-    model: str = "CNN"
-    kernel: int = 3
-    num_filters: int = 32
-    learn_rate: float = 0.001
-    batch_size: int = 25
-    epochs: int = 5
-    seed: int = 0
-    plot: bool = True
-    experiment_name: str = "colourization_cnn"
-    visualize: bool = False
-    downsize_input: bool = False
+from cnn.data_types import ModelParams
 
 
 def train(args: ModelParams):
@@ -80,17 +59,22 @@ def train(args: ModelParams):
 
     print("Transforming data...")
     train_rgb, train_grey = process(
-        x_train, y_train, downsize_input=args.downsize_input
+        x_train,
+        y_train,
+        downsize_input=args.downsize_input,
+        category=args.input_category,
     )
     train_rgb_cat = get_rgb_cat(train_rgb, colours)
-    test_rgb, test_grey = process(x_test, y_test, downsize_input=args.downsize_input)
+    test_rgb, test_grey = process(
+        x_test, y_test, downsize_input=args.downsize_input, category=args.input_category
+    )
     test_rgb_cat = get_rgb_cat(test_rgb, colours)
 
     # Create the outputs folder if not created already
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    print("Beginning training ...")
+    print(f"Beginning training on category: {args.input_category.value}")
     if args.gpu:
         cnn.cuda()
     start = time.time()
@@ -162,8 +146,7 @@ def train(args: ModelParams):
         valid_losses.append(val_loss)
         valid_accs.append(val_acc)
         print(
-            "Epoch [%d/%d], Val Loss: %.4f, Val Acc: %.1f%%, Time(s): %d"
-            % (epoch + 1, args.epochs, val_loss, val_acc, time_elapsed)
+            f"Epoch {epoch + 1}/{args.epochs}, Val Loss: {round(val_loss, 4)}, Val Acc: {round(val_acc, 1)}%, Time(s): {round(time_elapsed,0)}"
         )
 
     # Plot training curve

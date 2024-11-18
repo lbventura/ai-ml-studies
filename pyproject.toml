@@ -1,0 +1,3 @@
+[tool.mypy."cnn-arch"]
+disallow_untyped_defs = true
+strict = true

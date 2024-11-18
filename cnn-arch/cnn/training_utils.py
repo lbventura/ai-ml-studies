@@ -13,6 +13,7 @@ from torch.nn.modules.loss import _Loss
 
 
 from cnn.data_preprocessing import get_cat_rgb, get_rgb_cat, process
+from cnn.data_types import ModelParams
 
 
 def get_batch(
@@ -65,7 +66,7 @@ def compute_loss(
     labels: torch.Tensor,
     batch_size: int,
     num_colours: int,
-):
+) -> torch.Tensor:
     """
     Helper function to compute the loss. Since this is a pixelwise
     prediction task we need to reshape the output and ground truth
@@ -98,7 +99,7 @@ def run_validation_step(
     plotpath: Optional[str] = None,
     visualize: bool = True,
     downsize_input: bool = False,
-):
+) -> tuple[float, float, np.array]:
     correct = 0.0
     total = 0.0
     losses = []
@@ -140,7 +141,7 @@ def plot(
     path: str,
     visualize: bool,
     compare_bilinear: bool = False,
-):
+) -> None:
     """
     Generate png plots of input, ground truth, and outputs
 
@@ -196,22 +197,24 @@ def plot(
         plt.savefig(path)
 
 
-def toimage(img, cmin, cmax):
+def toimage(img: np.array, cmin: float, cmax: float) -> Image:
     return Image.fromarray((img.clip(cmin, cmax) * 255).astype(np.uint8))
 
 
-def plot_activation(args, cnn):
+def plot_activation(colours_path: str, args: ModelParams, cnn: nn.Module) -> None:
     # LOAD THE COLOURS CATEGORIES
-    colours = np.load(args.colours)[0]
+    colours = np.load(colours_path)[0]
     _ = np.shape(colours)[0]
 
-    (x_train, y_train), (x_test, y_test) = load_cifar10()
-    test_rgb, test_grey = process(x_test, y_test, downsize_input=args.downsize_input)
+    (_, _), (x_test, y_test) = load_cifar10()
+    test_rgb, test_grey = process(
+        x_test, y_test, downsize_input=args.downsize_input, category=args.input_category
+    )
     test_rgb_cat = get_rgb_cat(test_rgb, colours)
 
-    # Take the idnex of the test image
+    # Take the index of the test image
     _id = args.index
-    outdir = "outputs/" + args.experiment_name + "/act" + str(id)
+    outdir = "outputs/" + args.experiment_name + "/act" + str(_id)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     images, labels = get_torch_vars(
@@ -233,10 +236,10 @@ def plot_activation(args, cnn):
     img = np.transpose(test_rgb[_id], [1, 2, 0])
     toimage(img, cmin=0, cmax=1).save(os.path.join(outdir, f"input_{_id}_gt.png"))
 
-    def add_border(img):
+    def add_border(img: np.array) -> np.array:
         return np.pad(img, 1, "constant", constant_values=1.0)
 
-    def draw_activations(path, activation, imgwidth=4):
+    def draw_activations(path: str, activation: np.array, imgwidth: int = 4):
         img = np.vstack(
             [
                 np.hstack(

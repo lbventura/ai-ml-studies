@@ -3,7 +3,6 @@
 
 import os
 import pickle
-import sys
 import tarfile
 
 import numpy as np
@@ -26,14 +25,11 @@ def get_file(fname: str, origin: str, untar: bool = False) -> str:
     if not os.path.exists(fpath):
         print("Downloading data from", origin)
         try:
-            try:
-                urlretrieve(origin, fpath)
-            except Exception as e:
-                raise e
-        except (Exception, KeyboardInterrupt):
+            urlretrieve(origin, fpath)
+        except (Exception, KeyboardInterrupt) as e:
             if os.path.exists(fpath):
                 os.remove(fpath)
-            raise
+            raise e
 
     if untar:
         if not os.path.exists(untar_fpath):
@@ -45,7 +41,9 @@ def get_file(fname: str, origin: str, untar: bool = False) -> str:
     return fpath
 
 
-def load_batch(fpath: str, label_key: str = "labels"):
+def load_batch(
+    fpath: str, label_key: str = "labels", num_channels: int = 3, image_size: int = 32
+) -> tuple[np.ndarray, np.ndarray]:
     """Internal utility for parsing CIFAR data.
     # Arguments
         fpath: path the file to parse.
@@ -54,21 +52,17 @@ def load_batch(fpath: str, label_key: str = "labels"):
     # Returns
         A tuple `(data, labels)`.
     """
-    f = open(fpath, "rb")
-    if sys.version_info < (3,):
-        d = pickle.load(f)
-    else:
+    with open(fpath, "rb") as f:
         d = pickle.load(f, encoding="bytes")
         # decode utf8
         d_decoded = {}
         for k, v in d.items():
             d_decoded[k.decode("utf8")] = v
         d = d_decoded
-    f.close()
     data = d["data"]
     labels = d[label_key]
 
-    data = data.reshape(data.shape[0], 3, 32, 32)
+    data = data.reshape(data.shape[0], num_channels, image_size, image_size)
     return data, labels
 
 
@@ -84,18 +78,24 @@ def load_cifar10(
     path = get_file(dirname, origin=origin, untar=True)
 
     num_train_samples = 50000
+    n_channels = 3
+    image_size = 32
 
-    x_train = np.zeros((num_train_samples, 3, 32, 32), dtype="uint8")
+    x_train = np.zeros(
+        (num_train_samples, n_channels, image_size, image_size), dtype="uint8"
+    )
     y_train = np.zeros((num_train_samples,), dtype="uint8")
 
     for i in range(1, 6):
+        # this works because there are 6 batch files in data
+        # numbered from 1 to 5
         fpath = os.path.join(path, "data_batch_" + str(i))
-        data, labels = load_batch(fpath)
+        data, labels = load_batch(fpath, num_channels=n_channels, image_size=image_size)
         x_train[(i - 1) * 10000 : i * 10000, :, :, :] = data
         y_train[(i - 1) * 10000 : i * 10000] = labels
 
     fpath = os.path.join(path, "test_batch")
-    x_test, y_test = load_batch(fpath)
+    x_test, y_test = load_batch(fpath, num_channels=n_channels, image_size=image_size)
 
     y_train = np.reshape(y_train, (len(y_train), 1))
     y_test = np.reshape(y_test, (len(y_test), 1))
