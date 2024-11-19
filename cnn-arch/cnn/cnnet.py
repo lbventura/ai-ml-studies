@@ -3,6 +3,8 @@ import torch
 
 
 class CNN(nn.Module):  # type: ignore
+    # Define the CNN architecture
+    # for colourization as a classification problem
     def __init__(
         self, kernel: int, num_filters: int, num_colours: int, num_in_channels: int
     ):
@@ -15,7 +17,7 @@ class CNN(nn.Module):  # type: ignore
                 out_channels=num_filters,
                 kernel_size=kernel,
                 padding=padding,
-            ),  # input size is now num_in_channels
+            ),
             nn.BatchNorm2d(num_filters),
             nn.ReLU(),
             nn.MaxPool2d(2),
@@ -60,7 +62,7 @@ class CNN(nn.Module):  # type: ignore
                 out_channels=num_colours,
                 kernel_size=kernel,
                 padding=padding,
-            ),  # output size is now number of colors
+            ),
             nn.BatchNorm2d(num_colours),
             nn.ReLU(),
             nn.Upsample(scale_factor=2),
@@ -70,7 +72,7 @@ class CNN(nn.Module):  # type: ignore
             out_channels=num_colours,
             kernel_size=kernel,
             padding=padding,
-        )  # Change the output size from 3 (RBG) to the number of colors
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         self.out1 = self.downconv1(x)

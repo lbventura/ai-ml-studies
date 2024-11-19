@@ -76,7 +76,7 @@ def process(
     category: Categories = Categories.HORSES,
 ) -> tuple[np.array, np.array]:
     """
-    Pre-process CIFAR10 images by taking only the horse category,
+    Pre-process CIFAR10 images by taking only the chosen category,
     shuffling, and have colour values be bound between 0 and 1
 
     Args:

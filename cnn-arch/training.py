@@ -11,8 +11,8 @@ from cnn.data_extraction import load_cifar10, load_colors
 from cnn.data_preprocessing import get_rgb_cat, process
 from cnn.training_utils import (
     get_batch,
-    get_torch_vars,
     compute_loss,
+    get_torch_vars,
     plot,
     run_validation_step,
 )
@@ -20,40 +20,16 @@ from cnn.training_utils import (
 from cnn.unet import UNet
 
 from pathlib import Path
-from cnn.data_types import ModelParams
+from cnn.data_types import ModelParams, ModelData
 
 
-def train(args: ModelParams):
-    torch.set_num_threads(5)
-    # Numpy random seed
-    npr.seed(args.seed)
-
-    # Save directory
-    parent_path = Path(__file__).parent
-    save_dir = parent_path / f"outputs/{args.experiment_name}"
+def _prepare_data(args: ModelParams) -> tuple[np.array, ModelData]:
     colors_dir = load_colors() + "/colour_kmeans24_cat7.npy"
-
     # LOAD THE COLOURS CATEGORIES
     colours = np.load(colors_dir, allow_pickle=True, encoding="bytes")[0]
-    num_colours = np.shape(colours)[0]
+    print(f"The number of num_colours is {np.shape(colours)[0]}")
 
-    # INPUT CHANNEL
-    num_in_channels = 1 if not args.downsize_input else 3
-
-    print(f"The number of num_in_channels is {num_in_channels}")
-    print(f"The number of num_colours is {num_colours}")
-
-    # LOAD THE MODEL
-    if args.model == "CNN":
-        cnn = CNN(args.kernel, args.num_filters, num_colours, num_in_channels)
-    elif args.model == "UNet":
-        cnn = UNet(args.kernel, args.num_filters, num_colours, num_in_channels)
-
-    # LOSS FUNCTION
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=args.learn_rate)
-
-    # DATA
+    # LOAD DATA
     print("Loading data...")
     (x_train, y_train), (x_test, y_test) = load_cifar10()
 
@@ -65,16 +41,53 @@ def train(args: ModelParams):
         category=args.input_category,
     )
     train_rgb_cat = get_rgb_cat(train_rgb, colours)
+
     test_rgb, test_grey = process(
         x_test, y_test, downsize_input=args.downsize_input, category=args.input_category
     )
     test_rgb_cat = get_rgb_cat(test_rgb, colours)
 
+    return (
+        colours,
+        ModelData(
+            train_grey=train_grey,
+            train_rgb_cat=train_rgb_cat,
+            test_grey=test_grey,
+            test_rgb_cat=test_rgb_cat,
+        ),
+    )
+
+
+def train(args: ModelParams):
+    torch.set_num_threads(5)
+    # Numpy random seed
+    npr.seed(args.seed)
+
+    # Save directory
+    save_dir = str(Path(__file__).parent) + f"/outputs/{args.experiment_name}"
+
     # Create the outputs folder if not created already
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    print(f"Beginning training on category: {args.input_category.value}")
+    # INPUT CHANNEL
+    num_in_channels = 1 if not args.downsize_input else 3
+
+    print(f"The number of num_in_channels is {num_in_channels}")
+
+    # PREPARE DATA
+    colours, model_data = _prepare_data(args=args)
+    num_colours = np.shape(colours)[0]
+
+    # SETUP THE MODEL
+    if args.model == "CNN":
+        cnn = CNN(args.kernel, args.num_filters, num_colours, num_in_channels)
+    elif args.model == "UNet":
+        cnn = UNet(args.kernel, args.num_filters, num_colours, num_in_channels)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(cnn.parameters(), lr=args.learn_rate)
+
+    print(f"Beginning training on category: {args.input_category}")
     if args.gpu:
         cnn.cuda()
     start = time.time()
@@ -87,11 +100,12 @@ def train(args: ModelParams):
         cnn.train()  # Change model to 'train' mode
         losses = []
         for _, (xs, ys) in enumerate(
-            get_batch(train_grey, train_rgb_cat, args.batch_size)
+            get_batch(model_data.train_grey, model_data.train_rgb_cat, args.batch_size)
         ):
+            optimizer.zero_grad()
+
             images, labels = get_torch_vars(xs, ys, args.gpu)
             # Forward + Backward + Optimize
-            optimizer.zero_grad()
             outputs = cnn(images)
 
             loss = compute_loss(
@@ -107,7 +121,7 @@ def train(args: ModelParams):
 
         # plot training images
         if args.plot:
-            plt_path = str(save_dir / f"train_{args.model}_{epoch}.png")
+            plt_path = save_dir + f"/train_{args.model}_{epoch}.png"
             _, predicted = torch.max(outputs.data, 1, keepdim=True)
             plot(
                 xs,
@@ -119,7 +133,7 @@ def train(args: ModelParams):
                 args.downsize_input,
             )
 
-        # plot training images
+        # Compute loss and accuracy
         avg_loss = np.mean(losses)
         train_losses.append(avg_loss)
         time_elapsed = time.time() - start
@@ -132,8 +146,8 @@ def train(args: ModelParams):
         val_loss, val_acc, predicted = run_validation_step(
             cnn,
             criterion,
-            test_grey,
-            test_rgb_cat,
+            model_data.test_grey,
+            model_data.test_rgb_cat,
             args.batch_size,
             args.gpu,
             colours,
@@ -146,7 +160,7 @@ def train(args: ModelParams):
         valid_losses.append(val_loss)
         valid_accs.append(val_acc)
         print(
-            f"Epoch {epoch + 1}/{args.epochs}, Val Loss: {round(val_loss, 4)}, Val Acc: {round(val_acc, 1)}%, Time(s): {round(time_elapsed,0)}"
+            f"Epoch {epoch + 1}/{args.epochs}, Val Loss: {round(val_loss, 4)}, Val Acc: {round(val_acc.item(), 1)}%, Time(s): {round(time_elapsed,0)}"
         )
 
     # Plot training curve
@@ -156,7 +170,7 @@ def train(args: ModelParams):
     plt.legend()
     plt.title("Loss")
     plt.xlabel("Epochs")
-    plt.savefig(save_dir / "training_curve.png")
+    plt.savefig(save_dir + "/training_curve.png")
 
     if args.checkpoint:
         print("Saving model...")
@@ -166,5 +180,5 @@ def train(args: ModelParams):
 
 
 if __name__ == "__main__":
-    args = ModelParams()
+    args = ModelParams(epochs=25, model="UNet")
     cnn, predicted = train(args)

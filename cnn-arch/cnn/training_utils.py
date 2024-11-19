@@ -1,19 +1,15 @@
-import os
 from typing import Generator, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.misc
 import torch
 import torch.nn as nn
-from cnn.data_extraction import load_cifar10
-from PIL import Image
 from torch.autograd import Variable
 from torch.nn.modules.loss import _Loss
 
 
-from cnn.data_preprocessing import get_cat_rgb, get_rgb_cat, process
-from cnn.data_types import ModelParams
+from cnn.data_preprocessing import get_cat_rgb
+from cnn.data_extraction import IMAGE_SIZE
 
 
 def get_batch(
@@ -82,9 +78,13 @@ def compute_loss(
       pytorch tensor for loss
     """
     loss_out = (
-        outputs.transpose(1, 3).contiguous().view([batch_size * 32 * 32, num_colours])
+        outputs.transpose(1, 3)
+        .contiguous()
+        .view([batch_size * IMAGE_SIZE * IMAGE_SIZE, num_colours])
     )
-    loss_lab = labels.transpose(1, 3).contiguous().view([batch_size * 32 * 32])
+    loss_lab = (
+        labels.transpose(1, 3).contiguous().view([batch_size * IMAGE_SIZE * IMAGE_SIZE])
+    )
     return criterion(loss_out, loss_lab)
 
 
@@ -99,12 +99,12 @@ def run_validation_step(
     plotpath: Optional[str] = None,
     visualize: bool = True,
     downsize_input: bool = False,
-) -> tuple[float, float, np.array]:
+) -> tuple[float, torch.Tensor, np.array]:
     correct = 0.0
     total = 0.0
     losses = []
     num_colours = np.shape(colours)[0]
-    for i, (xs, ys) in enumerate(get_batch(test_grey, test_rgb_cat, batch_size)):
+    for _, (xs, ys) in enumerate(get_batch(test_grey, test_rgb_cat, batch_size)):
         images, labels = get_torch_vars(xs, ys, gpu)
         outputs = cnn(images)
 
@@ -114,7 +114,7 @@ def run_validation_step(
         losses.append(val_loss.data.item())
 
         _, predicted = torch.max(outputs.data, 1, keepdim=True)
-        total += labels.size(0) * 32 * 32
+        total += labels.size(0) * IMAGE_SIZE * IMAGE_SIZE
         correct += (predicted == labels.data).sum()
 
     if plotpath:  # only plot if a path is provided
@@ -161,7 +161,7 @@ def plot(
         np.hstack(np.tile(grey, [1, 1, 1, 3])),
         np.hstack(gtcolor),
         np.hstack(predcolor),
-    ]
+    ]  # the output is composed of 3 images (from top to bottom): the greyscale input, the ground truth, and the predicted output
 
     if compare_bilinear:
         downsize_module = nn.Sequential(
@@ -195,69 +195,3 @@ def plot(
         plt.show()
     else:
         plt.savefig(path)
-
-
-def toimage(img: np.array, cmin: float, cmax: float) -> Image:
-    return Image.fromarray((img.clip(cmin, cmax) * 255).astype(np.uint8))
-
-
-def plot_activation(colours_path: str, args: ModelParams, cnn: nn.Module) -> None:
-    # LOAD THE COLOURS CATEGORIES
-    colours = np.load(colours_path)[0]
-    _ = np.shape(colours)[0]
-
-    (_, _), (x_test, y_test) = load_cifar10()
-    test_rgb, test_grey = process(
-        x_test, y_test, downsize_input=args.downsize_input, category=args.input_category
-    )
-    test_rgb_cat = get_rgb_cat(test_rgb, colours)
-
-    # Take the index of the test image
-    _id = args.index
-    outdir = "outputs/" + args.experiment_name + "/act" + str(_id)
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    images, labels = get_torch_vars(
-        np.expand_dims(test_grey[_id], 0), np.expand_dims(test_rgb_cat[_id], 0)
-    )
-    cnn.cpu()
-    outputs = cnn(images)
-    _, predicted = torch.max(outputs.data, 1, keepdim=True)
-    predcolor = get_cat_rgb(predicted.cpu().numpy()[0, 0, :, :], colours)
-    img = predcolor
-    toimage(predcolor, cmin=0, cmax=1).save(os.path.join(outdir, f"output_{_id}.png"))
-
-    if not args.downsize_input:
-        img = np.tile(np.transpose(test_grey[_id], [1, 2, 0]), [1, 1, 3])
-    else:
-        img = np.transpose(test_grey[_id], [1, 2, 0])
-    toimage(img, cmin=0, cmax=1).save(os.path.join(outdir, f"input_{_id}.png"))
-
-    img = np.transpose(test_rgb[_id], [1, 2, 0])
-    toimage(img, cmin=0, cmax=1).save(os.path.join(outdir, f"input_{_id}_gt.png"))
-
-    def add_border(img: np.array) -> np.array:
-        return np.pad(img, 1, "constant", constant_values=1.0)
-
-    def draw_activations(path: str, activation: np.array, imgwidth: int = 4):
-        img = np.vstack(
-            [
-                np.hstack(
-                    [
-                        add_border(filter)
-                        for filter in activation[
-                            i * imgwidth : (i + 1) * imgwidth, :, :
-                        ]
-                    ]
-                )
-                for i in range(activation.shape[0] // imgwidth)
-            ]
-        )
-        scipy.misc.imsave(path, img)
-
-    for i, tensor in enumerate([cnn.out1, cnn.out2, cnn.out3, cnn.out4, cnn.out5]):
-        draw_activations(
-            os.path.join(outdir, f"conv{i + 1}_out_{_id}.png"),
-            tensor.data.cpu().numpy()[0],
-        )
-    print(f"Visualization results are saved to {outdir}")

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+import numpy as np
+
 
 class Categories(Enum):
     DOGS = 5
@@ -21,8 +23,18 @@ class ModelParams:
     epochs: int = 5
     seed: int = 0
     plot: bool = True
-    experiment_name: str = "colourization_cnn"
     visualize: bool = False
     downsize_input: bool = False
     input_category: Categories = Categories.HORSES
     index: int = 0
+
+    def __post_init__(self):
+        self.experiment_name = f"colourization_{self.model.lower()}_kernel_{self.kernel}_filters_{self.num_filters}"
+
+
+@dataclass
+class ModelData:
+    train_grey: np.array
+    train_rgb_cat: np.array
+    test_grey: np.array
+    test_rgb_cat: np.array

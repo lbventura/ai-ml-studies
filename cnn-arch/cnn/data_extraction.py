@@ -9,6 +9,8 @@ import numpy as np
 from six.moves.urllib.request import urlretrieve  # type: ignore
 from pathlib import Path
 
+IMAGE_SIZE = 32
+
 
 def get_file(fname: str, origin: str, untar: bool = False) -> str:
     datadir = Path(__file__).parent.parent / "data"
@@ -42,7 +44,10 @@ def get_file(fname: str, origin: str, untar: bool = False) -> str:
 
 
 def load_batch(
-    fpath: str, label_key: str = "labels", num_channels: int = 3, image_size: int = 32
+    fpath: str,
+    label_key: str = "labels",
+    num_channels: int = 3,
+    image_size: int = IMAGE_SIZE,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Internal utility for parsing CIFAR data.
     # Arguments
@@ -79,7 +84,7 @@ def load_cifar10(
 
     num_train_samples = 50000
     n_channels = 3
-    image_size = 32
+    image_size = IMAGE_SIZE
 
     x_train = np.zeros(
         (num_train_samples, n_channels, image_size, image_size), dtype="uint8"
