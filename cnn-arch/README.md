@@ -9,4 +9,9 @@ It is insightful to check the model behavior by visualizing the predictions.
 | ![Model Prediction at Epoch 0](examples/unet-0-ex1.png) | ![Model Prediction at Epoch 24](examples/unet-24-ex1.png) |
 |:---------------------------------------------------------------:|:---------------------------------------------------------------:|
 
-The image on the left (epoch 0) has a much lower color contrast than the image on the right (epoch 24). The model is learning to represent colors as the training progresses.
+The image on the left (epoch 0) has a much lower color contrast than the image on the right (epoch 24). The model is learning to represent colors as the training progresses. Another example:
+
+| ![Model Prediction at Epoch 0](examples/unet-0-ex2.png) | ![Model Prediction at Epoch 24](examples/unet-24-ex2.png) |
+|:---------------------------------------------------------------:|:---------------------------------------------------------------:|
+
+The image on the left is much lighter than the original image. At epoch 24, the image is more colorful and closer to the original image.
