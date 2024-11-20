@@ -11,13 +11,9 @@ class Categories(Enum):
 
 
 @dataclass
-class ModelParams:
+class TrainingParams:
     gpu: bool = False
-    valid: bool = False
     checkpoint: str = ""
-    model: str = "CNN"
-    kernel: int = 3
-    num_filters: int = 32
     learn_rate: float = 0.001
     batch_size: int = 25
     epochs: int = 5
@@ -26,7 +22,13 @@ class ModelParams:
     visualize: bool = False
     downsize_input: bool = False
     input_category: Categories = Categories.HORSES
-    index: int = 0
+
+
+@dataclass
+class ModelParams:
+    model: str = "CNN"
+    kernel: int = 3
+    num_filters: int = 32
 
     def __post_init__(self):
         self.experiment_name = f"colourization_{self.model.lower()}_kernel_{self.kernel}_filters_{self.num_filters}"
