@@ -1,3 +1,7 @@
 [tool.mypy."cnn-arch"]
 disallow_untyped_defs = true
 strict = true
+
+[tool.mypy."rnn"]
+disallow_untyped_defs = true
+strict = true
