@@ -1,18 +1,11 @@
 import os
 from pathlib import Path
-import pickle as pkl
 
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
-
-import torch
-from torch.autograd import Variable
 
 from six.moves.urllib.request import urlretrieve  # type: ignore
 import tarfile
-import torch.nn as nn
-from rnn_trans_arch.data_types import AttrDict
 
 
 def get_file(
@@ -49,65 +42,6 @@ def get_file(
         return untar_fpath
 
     return fpath
-
-
-def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
-    """Wraps a Tensor in a Variable, optionally placing it on the GPU.
-
-    Arguments:
-        tensor: A Tensor object.
-        cuda: A boolean flag indicating whether to use the GPU.
-
-    Returns:
-        A Variable object, on the GPU if cuda==True.
-    """
-    if cuda:
-        return Variable(tensor.cuda())
-    else:
-        return Variable(tensor)
-
-
-def create_dir_if_not_exists(directory: str) -> None:
-    """Creates a directory if it doesn't already exist."""
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-
-def save_loss_plot(
-    train_losses: list[float], val_losses: list[float], opts: AttrDict
-) -> None:
-    """Saves a plot of the training and validation loss curves."""
-    plt.figure()
-    plt.plot(range(len(train_losses)), train_losses)
-    plt.plot(range(len(val_losses)), val_losses)
-    plt.title("BS={}, nhid={}".format(opts.batch_size, opts.hidden_size), fontsize=20)
-    plt.xlabel("Epochs", fontsize=16)
-    plt.ylabel("Loss", fontsize=16)
-    plt.xticks(fontsize=14)
-    plt.yticks(fontsize=14)
-    plt.tight_layout()
-    plt.savefig(os.path.join(opts.checkpoint_dir, "loss_plot.pdf"))
-    plt.close()
-
-
-def checkpoint(
-    encoder: nn.Module,
-    decoder: nn.Module,
-    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    opts: AttrDict,
-) -> None:
-    """Saves the current encoder and decoder models, along with idx_dict, which
-    contains the char_to_index and index_to_char mappings, and the start_token
-    and end_token values.
-    """
-    with open(os.path.join(opts.checkpoint_dir, "encoder.pt"), "wb") as f:
-        torch.save(encoder, f)
-
-    with open(os.path.join(opts.checkpoint_dir, "decoder.pt"), "wb") as f:
-        torch.save(decoder, f)
-
-    with open(os.path.join(opts.checkpoint_dir, "idx_dict.pkl"), "wb") as f:
-        pkl.dump(idx_dict, f)
 
 
 def create_dict(

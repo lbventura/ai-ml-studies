@@ -2,13 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from rnn_trans_arch.data_extraction import (
-    checkpoint,
-    load_data,
-    save_loss_plot,
-    to_var,
-)
-from rnn_trans_arch.data_types import AttrDict
+from rnn_trans_arch.data_types import ModelParams, TrainingParams
 
 import numpy as np
 
@@ -16,6 +10,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
+from torch.autograd import Variable
+
+import pickle as pkl
 
 
 def string_to_index_list(
@@ -31,17 +28,15 @@ def translate_sentence(
     sentence: str,
     encoder: nn.Module,
     decoder: nn.Module,
-    idx_dict: dict[str, dict[str, int] | dict[int, str] | int] | None,
-    opts: AttrDict,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    cuda: bool,
 ) -> str:
     """Translates a sentence from English to Pig-Latin, by splitting the sentence into
     words (whitespace-separated), running the encoder-decoder model to translate each
     word independently, and then stitching the words back together with spaces between them.
     """
-    if idx_dict is None:
-        line_pairs, vocab_size, idx_dict = load_data()
     return " ".join(
-        [translate(word, encoder, decoder, idx_dict, opts) for word in sentence.split()]
+        [translate(word, encoder, decoder, idx_dict, cuda) for word in sentence.split()]
     )
 
 
@@ -50,7 +45,7 @@ def translate(
     encoder: nn.Module,
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    opts: AttrDict,
+    cuda: bool,
 ) -> str:
     """Translates a given string from English to Pig-Latin."""
 
@@ -64,13 +59,13 @@ def translate(
 
     indexes = string_to_index_list(input_string, char_to_index, end_token)
     indexes = to_var(
-        torch.LongTensor(indexes).unsqueeze(0), opts.cuda
+        torch.LongTensor(indexes).unsqueeze(0), cuda
     )  # Unsqueeze to make it like BS = 1
 
     encoder_annotations, encoder_last_hidden = encoder(indexes)
 
     decoder_hidden = encoder_last_hidden
-    decoder_input = to_var(torch.LongTensor([[start_token]]), opts.cuda)  # For BS = 1
+    decoder_input = to_var(torch.LongTensor([[start_token]]), cuda)  # For BS = 1
     decoder_inputs = decoder_input
 
     for i in range(max_generated_chars):
@@ -97,16 +92,30 @@ def translate(
     return gen_string
 
 
+def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
+    """Wraps a Tensor in a Variable, optionally placing it on the GPU.
+
+    Arguments:
+        tensor: A Tensor object.
+        cuda: A boolean flag indicating whether to use the GPU.
+
+    Returns:
+        A Variable object, on the GPU if cuda==True.
+    """
+    if cuda:
+        return Variable(tensor.cuda())
+    else:
+        return Variable(tensor)
+
+
 def visualize_attention(
     input_string: str,
     encoder: nn.Module,
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    opts: AttrDict,
+    cuda: bool,
 ) -> str:
     """Generates a heatmap to show where attention is focused in each decoder step."""
-    if idx_dict is None:
-        _, _, idx_dict = load_data()
     char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
     index_to_char: dict[int, str] = idx_dict["index_to_char"]  # type: ignore
     start_token: int = idx_dict["start_token"]  # type: ignore
@@ -117,13 +126,13 @@ def visualize_attention(
 
     indexes = string_to_index_list(input_string, char_to_index, end_token)
     indexes = to_var(
-        torch.LongTensor(indexes).unsqueeze(0), opts.cuda
+        torch.LongTensor(indexes).unsqueeze(0), cuda
     )  # Unsqueeze to make it like BS = 1
 
     encoder_annotations, encoder_hidden = encoder(indexes)
 
     decoder_hidden = encoder_hidden
-    decoder_input = to_var(torch.LongTensor([[start_token]]), opts.cuda)  # For BS = 1
+    decoder_input = to_var(torch.LongTensor([[start_token]]), cuda)  # For BS = 1
     decoder_inputs = decoder_input
 
     produced_end_token = False
@@ -190,7 +199,7 @@ def compute_loss(
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
     criterion: _Loss,
     optimizer: Optimizer,
-    opts: AttrDict,
+    training_params: TrainingParams,
 ) -> float:
     """Train/Evaluate the model on a dataset.
 
@@ -201,7 +210,7 @@ def compute_loss(
         idx_dict: Contains char-to-index and index-to-char mappings, and start & end token indexes.
         criterion: Used to compute the CrossEntropyLoss for each decoder output.
         optimizer: Train the weights if an optimizer is given. None if only evaluate the model.
-        opts: The command-line arguments.
+        training_params: The training parameters.
 
     Returns:
         mean_loss: The average loss over all batches from data_dict.
@@ -223,14 +232,16 @@ def compute_loss(
         ]
 
         num_tensors = len(input_tensors)
-        num_batches = int(np.ceil(num_tensors / float(opts.batch_size)))
+        num_batches = int(np.ceil(num_tensors / float(training_params.batch_size)))
 
         for i in range(num_batches):
-            start = i * opts.batch_size
-            end = start + opts.batch_size
+            start = i * training_params.batch_size
+            end = start + training_params.batch_size
 
-            inputs = to_var(torch.stack(input_tensors[start:end]), opts.cuda)
-            targets = to_var(torch.stack(target_tensors[start:end]), opts.cuda)
+            inputs = to_var(torch.stack(input_tensors[start:end]), training_params.cuda)
+            targets = to_var(
+                torch.stack(target_tensors[start:end]), training_params.cuda
+            )
 
             # The batch size may be different in each epoch
             BS = inputs.size(0)
@@ -240,7 +251,9 @@ def compute_loss(
             start_vector = (
                 torch.ones(BS).long().unsqueeze(1) * start_token
             )  # BS x 1 --> 16x1  CHECKED
-            decoder_input = to_var(start_vector, opts.cuda)  # BS x 1 --> 16x1  CHECKED
+            decoder_input = to_var(
+                start_vector, training_params.cuda
+            )  # BS x 1 --> 16x1  CHECKED
 
             loss = 0.0
 
@@ -278,7 +291,8 @@ def training_loop(
     decoder: nn.Module,
     criterion: _Loss,
     optimizer: Optimizer,
-    opts: AttrDict,
+    training_params: TrainingParams,
+    model_params: ModelParams,
     test_sentence: str,
 ) -> None:
     """Runs the main training loop; evaluates the model on the val set every epoch.
@@ -294,29 +308,49 @@ def training_loop(
         decoder: A decoder model (with or without attention) to generate output tokens.
         criterion: Used to compute the CrossEntropyLoss for each decoder output.
         optimizer: Implements a step rule to update the parameters of the encoder and decoder.
-        opts: The command-line arguments.
+        training_params: The training parameters.
+        model_params: The model parameters.
     """
 
-    loss_log = open(os.path.join(opts.checkpoint_dir, "loss_log.txt"), "w")
+    loss_log = open(os.path.join(training_params.checkpoint_dir, "loss_log.txt"), "w")
 
     best_val_loss = 1e6
     train_losses = []
     val_losses = []
 
-    for epoch in range(opts.nepochs):
-        optimizer.param_groups[0]["lr"] *= opts.lr_decay
+    for epoch in range(training_params.nepochs):
+        optimizer.param_groups[0]["lr"] *= training_params.lr_decay
 
         train_loss = compute_loss(
-            train_dict, encoder, decoder, idx_dict, criterion, optimizer, opts
+            train_dict,
+            encoder,
+            decoder,
+            idx_dict,
+            criterion,
+            optimizer,
+            training_params=training_params,
         )
         val_loss = compute_loss(
-            val_dict, encoder, decoder, idx_dict, criterion, None, opts
+            val_dict,
+            encoder,
+            decoder,
+            idx_dict,
+            criterion,
+            None,
+            training_params=training_params,
         )
 
         if val_loss < best_val_loss:
-            checkpoint(encoder, decoder, idx_dict, opts)
+            checkpoint(
+                encoder,
+                decoder,
+                idx_dict,
+                checkpoint_dir=training_params.checkpoint_dir,
+            )
 
-        gen_string = translate_sentence(test_sentence, encoder, decoder, idx_dict, opts)
+        gen_string = translate_sentence(
+            test_sentence, encoder, decoder, idx_dict, cuda=training_params.cuda
+        )
         print(
             "Epoch: {:3d} | Train loss: {:.3f} | Val loss: {:.3f} | Gen: {:20s}".format(
                 epoch, train_loss, val_loss, gen_string
@@ -329,7 +363,32 @@ def training_loop(
         train_losses.append(train_loss)
         val_losses.append(val_loss)
 
-        save_loss_plot(train_losses, val_losses, opts)
+        save_loss_plot(
+            train_losses,
+            val_losses,
+            training_params=training_params,
+            model_params=model_params,
+        )
+
+
+def checkpoint(
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    checkpoint_dir: str,
+) -> None:
+    """Saves the current encoder and decoder models, along with idx_dict, which
+    contains the char_to_index and index_to_char mappings, and the start_token
+    and end_token values.
+    """
+    with open(os.path.join(checkpoint_dir, "encoder.pt"), "wb") as f:
+        torch.save(encoder, f)
+
+    with open(os.path.join(checkpoint_dir, "decoder.pt"), "wb") as f:
+        torch.save(decoder, f)
+
+    with open(os.path.join(checkpoint_dir, "idx_dict.pkl"), "wb") as f:
+        pkl.dump(idx_dict, f)
 
 
 def print_data_stats(
@@ -349,11 +408,24 @@ def print_data_stats(
     print("=" * 80)
 
 
-def print_opts(opts: AttrDict) -> None:
-    """Prints the values of all command-line arguments."""
-    print("=" * 80)
-    print("Opts".center(80))
-    print("-" * 80)
-    for key in opts.__dict__:
-        print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
-    print("=" * 80)
+def save_loss_plot(
+    train_losses: list[float],
+    val_losses: list[float],
+    training_params: TrainingParams,
+    model_params: ModelParams,
+) -> None:
+    """Saves a plot of the training and validation loss curves."""
+    plt.figure()
+    plt.plot(range(len(train_losses)), train_losses)
+    plt.plot(range(len(val_losses)), val_losses)
+    plt.title(
+        "BS={}, nhid={}".format(training_params.batch_size, model_params.hidden_size),
+        fontsize=20,
+    )
+    plt.xlabel("Epochs", fontsize=16)
+    plt.ylabel("Loss", fontsize=16)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.tight_layout()
+    plt.savefig(os.path.join(training_params.checkpoint_dir, "loss_plot.pdf"))
+    plt.close()

@@ -1,7 +1,7 @@
+import os
 import torch
-from rnn_trans_arch.data_types import AttrDict
+from rnn_trans_arch.data_types import ModelParams, TrainingParams
 from rnn_trans_arch.data_extraction import (
-    create_dir_if_not_exists,
     get_file,
     load_data,
     create_dict,
@@ -13,7 +13,6 @@ from rnn_trans_arch.gru import GRUEncoder, RNNDecoder
 from rnn_trans_arch.attention_decoder import RNNAttentionDecoder
 from rnn_trans_arch.transformer_decoder import TransformerDecoder
 from rnn_trans_arch.training_utils import (
-    print_opts,
     print_data_stats,
     training_loop,
     translate_sentence,
@@ -23,12 +22,14 @@ TEST_SENTENCE = "the air conditioning is working"
 
 
 def train(
-    opts: AttrDict,
+    training_params: TrainingParams,
+    model_params: ModelParams,
 ) -> tuple[
     nn.Module,
     nn.Module,
     dict[tuple[int, int], list[tuple[str, str]]],
     dict[tuple[int, int], list[tuple[str, str]]],
+    dict[str, dict[str, int] | dict[int, str] | int],
 ]:
     line_pairs, vocab_size, idx_dict = load_data()
     print_data_stats(line_pairs, vocab_size, idx_dict)
@@ -45,40 +46,48 @@ def train(
     ##########################################################################
     ### Setup: Create Encoder, Decoder, Learning Criterion, and Optimizers ###
     ##########################################################################
-    encoder = GRUEncoder(vocab_size=vocab_size, hidden_size=opts.hidden_size, opts=opts)
+    encoder = GRUEncoder(
+        vocab_size=vocab_size,
+        hidden_size=model_params.hidden_size,
+        cuda=training_params.cuda,
+    )
 
-    if opts.decoder_type == "rnn":
-        decoder = RNNDecoder(vocab_size=vocab_size, hidden_size=opts.hidden_size)
-    elif opts.decoder_type == "rnn_attention":
+    if model_params.decoder_type == "rnn":
+        decoder = RNNDecoder(
+            vocab_size=vocab_size, hidden_size=model_params.hidden_size
+        )
+    elif model_params.decoder_type == "rnn_attention":
         decoder = RNNAttentionDecoder(
             vocab_size=vocab_size,
-            hidden_size=opts.hidden_size,
-            attention_type=opts.attention_type,
+            hidden_size=model_params.hidden_size,
+            attention_type=model_params.attention_type,
         )
-    elif opts.decoder_type == "transformer":
+    elif model_params.decoder_type == "transformer":
         decoder = TransformerDecoder(
             vocab_size=vocab_size,
-            hidden_size=opts.hidden_size,
-            num_layers=opts.num_transformer_layers,
+            hidden_size=model_params.hidden_size,
+            num_layers=model_params.num_transformer_layers,
         )
     else:
         raise NotImplementedError
 
     #### setup checkpoint path
     model_name = "h{}-bs{}-{}".format(
-        opts.hidden_size, opts.batch_size, opts.decoder_type
+        model_params.hidden_size, training_params.batch_size, model_params.decoder_type
     )
-    opts.checkpoint_dir = model_name
-    create_dir_if_not_exists(opts.checkpoint_dir)
+    training_params.checkpoint_dir = model_name
+    if not os.path.exists(training_params.checkpoint_dir):
+        os.makedirs(training_params.checkpoint_dir)
 
-    if opts.cuda:
+    if training_params.cuda:
         encoder.cuda()
         decoder.cuda()
         print("Moved models to GPU!")
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(
-        list(encoder.parameters()) + list(decoder.parameters()), lr=opts.learning_rate
+        list(encoder.parameters()) + list(decoder.parameters()),
+        lr=training_params.learning_rate,
     )
 
     try:
@@ -90,21 +99,21 @@ def train(
             decoder,
             criterion,
             optimizer,
-            opts,
-            TEST_SENTENCE,
+            training_params=training_params,
+            model_params=model_params,
+            test_sentence=TEST_SENTENCE,
         )
     except KeyboardInterrupt:
         print("Exiting early from training.")
         return encoder, decoder  # type: ignore
 
-    return encoder, decoder, train_dict, val_dict
+    return encoder, decoder, train_dict, val_dict, idx_dict
 
 
 if __name__ == "__main__":
     torch.manual_seed(1)
-    args = AttrDict()
-
-    print_opts(args)
+    training_params = TrainingParams()
+    model_params = ModelParams()
 
     data_fpath = get_file(
         fname="pig_latin_data.txt",
@@ -112,15 +121,19 @@ if __name__ == "__main__":
         untar=False,
     )
 
-    rnn_attn_encoder_scaled_dot, rnn_attn_decoder_scaled_dot, train_dict, test_dict = (
-        train(args)
-    )
+    (
+        rnn_attn_encoder_scaled_dot,
+        rnn_attn_decoder_scaled_dot,
+        train_dict,
+        test_dict,
+        idx_dict,
+    ) = train(training_params=training_params, model_params=model_params)
     translated = translate_sentence(
         TEST_SENTENCE,
         rnn_attn_encoder_scaled_dot,
         rnn_attn_decoder_scaled_dot,
-        None,
-        args,
+        idx_dict,
+        cuda=training_params.cuda,
     )
 
     # rnn_encoder, rnn_decoder, train_dict , test_dict = train(args)
