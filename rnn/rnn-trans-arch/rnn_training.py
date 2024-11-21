@@ -1,6 +1,6 @@
 import os
 import torch
-from rnn_trans_arch.data_types import ModelParams, TrainingParams
+from rnn_trans_arch.data_types import DecoderType, ModelParams, TrainingParams
 from rnn_trans_arch.data_extraction import (
     get_file,
     load_data,
@@ -52,17 +52,18 @@ def train(
         cuda=training_params.cuda,
     )
 
-    if model_params.decoder_type == "rnn":
+    if model_params.decoder_type == DecoderType.rnn:
         decoder = RNNDecoder(
             vocab_size=vocab_size, hidden_size=model_params.hidden_size
         )
-    elif model_params.decoder_type == "rnn_attention":
+    elif model_params.decoder_type == DecoderType.rnn_attention:
         decoder = RNNAttentionDecoder(
             vocab_size=vocab_size,
             hidden_size=model_params.hidden_size,
             attention_type=model_params.attention_type,
         )
-    elif model_params.decoder_type == "transformer":
+    elif model_params.decoder_type == DecoderType.transformer:
+        assert model_params.num_transformer_layers is not None  # make mypy happy
         decoder = TransformerDecoder(
             vocab_size=vocab_size,
             hidden_size=model_params.hidden_size,
@@ -92,13 +93,13 @@ def train(
 
     try:
         training_loop(
-            train_dict,
-            val_dict,
-            idx_dict,
-            encoder,
-            decoder,
-            criterion,
-            optimizer,
+            train_dict=train_dict,
+            val_dict=val_dict,
+            idx_dict=idx_dict,
+            encoder=encoder,
+            decoder=decoder,
+            criterion=criterion,
+            optimizer=optimizer,
             training_params=training_params,
             model_params=model_params,
             test_sentence=TEST_SENTENCE,
@@ -135,8 +136,5 @@ if __name__ == "__main__":
         idx_dict,
         cuda=training_params.cuda,
     )
-
-    # rnn_encoder, rnn_decoder, train_dict , test_dict = train(args)
-    # translated = translate_sentence(TEST_SENTENCE, rnn_encoder, rnn_decoder, None, args)
 
     print("source:\t\t{} \ntranslated:\t{}".format(TEST_SENTENCE, translated))
