@@ -41,7 +41,7 @@ class ExecutionParams:
     bimodal: bool = False  # use bimodal data distribution
     loss_choice: LossChoice = LossChoice.BCE  # the choice of loss function
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.disc_number_intermediate_layers < 1:
             raise ValueError(
                 "The number of intermediate layers in the discriminator must be greater than 0"
@@ -73,7 +73,7 @@ class DataDistribution:
 
 
 class GeneratorDistribution:
-    def __init__(self, value_range: int):
+    def __init__(self, value_range: int) -> None:
         self.range = value_range
 
     def sample(self, N: int) -> np.ndarray:
@@ -81,7 +81,7 @@ class GeneratorDistribution:
         return np.linspace(-self.range, self.range, N) + np.random.random(N) * 0.01
 
 
-class Generator(nn.Module):
+class Generator(nn.Module):  # type: ignore
     def __init__(
         self, input_dim: int, hidden_dim: int, gen_number_extra_layers: int = 0
     ):
@@ -110,7 +110,7 @@ class Generator(nn.Module):
         return h1
 
 
-class Discriminator(nn.Module):
+class Discriminator(nn.Module):  # type: ignore
     def __init__(
         self,
         input_dim: int,
@@ -148,7 +148,7 @@ class Discriminator(nn.Module):
         return h3
 
 
-class MinibatchDiscrimination(nn.Module):
+class MinibatchDiscrimination(nn.Module):  # type: ignore
     """
     Create a set of new features (activations) that capture relationships between the input samples.
     These new features can then be used to perform minibatch discrimination, which helps the discriminator in a GAN
@@ -338,7 +338,7 @@ def plot_distributions(
     data_distribution: np.array,
     generator_distribution: np.array,
     sample_range: int,
-):
+) -> None:
     db_x = np.linspace(-sample_range, sample_range, len(decision_boundary))
     p_x = np.linspace(-sample_range, sample_range, len(data_distribution))
 
@@ -356,7 +356,7 @@ def plot_distributions(
     plt.show()
 
 
-def main(params: ExecutionParams):
+def main(params: ExecutionParams) -> None:
     if params.represent_real_data:
         samples = 10000
         sample_data = DataDistribution(bimodal=params.bimodal).sample(samples)

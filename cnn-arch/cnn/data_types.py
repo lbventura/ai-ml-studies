@@ -30,7 +30,7 @@ class ModelParams:
     kernel: int = 3
     num_filters: int = 32
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.experiment_name = f"colourization_{self.model.lower()}_kernel_{self.kernel}_filters_{self.num_filters}"
 
 

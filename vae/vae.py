@@ -27,7 +27,7 @@ def log_density_funnel(x: Tensor) -> Tensor:
 
 def plot_isocontours(
     ax: plt.Axes,
-    func: Callable,
+    func: Callable,  # type: ignore
     xlimits: list[float] = [-3, 3],
     ylimits: list[float] = [-5, 3],
     numticks: int = 101,
@@ -49,7 +49,7 @@ def plot_isocontours(
     ax.set_ylim(ylimits)
 
 
-class VAE(nn.Module):
+class VAE(nn.Module):  # type: ignore
     def __init__(self, use_normalization_flow: bool = False) -> None:
         super(VAE, self).__init__()
         self.encoder = nn.Sequential(nn.Linear(2, 100), nn.ReLU(), nn.Linear(100, 4))
