@@ -2,21 +2,16 @@ import torch
 import torch.nn as nn
 
 
-class MyGRUCell(nn.Module):
-    def __init__(self, input_size, hidden_size):
+class MyGRUCell(nn.Module):  # type: ignore
+    def __init__(self, input_size: int, hidden_size: int) -> None:
         super(MyGRUCell, self).__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # ------------
-        # FILL THIS IN
-        # ------------
         ## Input linear layers
         # The W_i{x} matrices have dimension n_hidden x n_input
-        self.Wiz = nn.Linear(
-            input_size, hidden_size, bias=False
-        )  # torch.randn(hidden_size, input_size).to('cuda')
+        self.Wiz = nn.Linear(input_size, hidden_size, bias=False)
         self.Wir = nn.Linear(input_size, hidden_size, bias=False)
         self.Win = nn.Linear(input_size, hidden_size, bias=False)
 
@@ -26,7 +21,7 @@ class MyGRUCell(nn.Module):
         self.Whr = nn.Linear(hidden_size, hidden_size)
         self.Whn = nn.Linear(hidden_size, hidden_size)
 
-    def forward(self, x, h_prev):
+    def forward(self, x: torch.Tensor, h_prev: torch.Tensor) -> torch.Tensor:
         """Forward pass of the GRU computation for one time step.
 
         Arguments
@@ -36,12 +31,6 @@ class MyGRUCell(nn.Module):
         Returns:
             h_new: batch_size x hidden_size
         """
-
-        # ------------
-        # FILL THIS IN
-        # ------------
-        # works, but worse than the GRUCell implementation
-
         z_first_term = self.Wiz(x)
         z_second_term = self.Whz(h_prev)
         z = torch.sigmoid(z_first_term + z_second_term)

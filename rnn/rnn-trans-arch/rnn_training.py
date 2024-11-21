@@ -1,11 +1,12 @@
 import torch
+from rnn_trans_arch.data_types import AttrDict
 from rnn_trans_arch.data_extraction import (
-    AttrDict,
     create_dir_if_not_exists,
     get_file,
     load_data,
     create_dict,
 )
+
 import torch.nn as nn
 import torch.optim as optim
 from rnn_trans_arch.gru import GRUEncoder, RNNDecoder
@@ -21,7 +22,14 @@ from rnn_trans_arch.training_utils import (
 TEST_SENTENCE = "the air conditioning is working"
 
 
-def train(opts):
+def train(
+    opts: AttrDict,
+) -> tuple[
+    nn.Module,
+    nn.Module,
+    dict[tuple[int, int], list[tuple[str, str]]],
+    dict[tuple[int, int], list[tuple[str, str]]],
+]:
     line_pairs, vocab_size, idx_dict = load_data()
     print_data_stats(line_pairs, vocab_size, idx_dict)
 
@@ -60,9 +68,8 @@ def train(opts):
     model_name = "h{}-bs{}-{}".format(
         opts.hidden_size, opts.batch_size, opts.decoder_type
     )
-    opts.checkpoint_path = model_name
-    create_dir_if_not_exists(opts.checkpoint_path)
-    ####
+    opts.checkpoint_dir = model_name
+    create_dir_if_not_exists(opts.checkpoint_dir)
 
     if opts.cuda:
         encoder.cuda()
@@ -88,7 +95,7 @@ def train(opts):
         )
     except KeyboardInterrupt:
         print("Exiting early from training.")
-        return encoder, decoder
+        return encoder, decoder  # type: ignore
 
     return encoder, decoder, train_dict, val_dict
 
@@ -96,18 +103,6 @@ def train(opts):
 if __name__ == "__main__":
     torch.manual_seed(1)
     args = AttrDict()
-    args_dict = {
-        "cuda": False,
-        "nepochs": 100,
-        "checkpoint_dir": "checkpoints",
-        "learning_rate": 0.005,
-        "lr_decay": 0.99,
-        "batch_size": 64,
-        "hidden_size": 20,
-        "decoder_type": "rnn_attention",  # options: rnn / rnn_attention / transformer
-        "attention_type": "additive",  # options: additive / scaled_dot
-    }
-    args.update(args_dict)
 
     print_opts(args)
 

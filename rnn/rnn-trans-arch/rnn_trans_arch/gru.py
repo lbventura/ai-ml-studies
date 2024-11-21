@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 from rnn_trans_arch.data_extraction import to_var
+from rnn_trans_arch.data_types import AttrDict
+from torch.autograd import Variable
 
 
-class GRUEncoder(nn.Module):
-    def __init__(self, vocab_size, hidden_size, opts):
+class GRUEncoder(nn.Module):  # type: ignore
+    def __init__(self, vocab_size: int, hidden_size: int, opts: AttrDict):
         super(GRUEncoder, self).__init__()
 
         self.vocab_size = vocab_size
@@ -14,7 +16,7 @@ class GRUEncoder(nn.Module):
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         self.gru = nn.GRUCell(hidden_size, hidden_size)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the encoder RNN.
 
         Arguments:
@@ -39,7 +41,7 @@ class GRUEncoder(nn.Module):
         annotations = torch.stack(annotations, dim=1)
         return annotations, hidden
 
-    def init_hidden(self, bs):
+    def init_hidden(self, bs: int) -> Variable:
         """Creates a tensor of zeros to represent the initial hidden states
         of a batch of sequences.
 
@@ -52,8 +54,8 @@ class GRUEncoder(nn.Module):
         return to_var(torch.zeros(bs, self.hidden_size), self.opts.cuda)
 
 
-class RNNDecoder(nn.Module):
-    def __init__(self, vocab_size, hidden_size):
+class RNNDecoder(nn.Module):  # type: ignore
+    def __init__(self, vocab_size: int, hidden_size: int):
         super(RNNDecoder, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -62,7 +64,9 @@ class RNNDecoder(nn.Module):
         self.rnn = nn.GRUCell(input_size=hidden_size, hidden_size=hidden_size)
         self.out = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, inputs, annotations, hidden_init):
+    def forward(
+        self, inputs: torch.Tensor, annotations: torch.Tensor, hidden_init: torch.Tensor
+    ) -> tuple[torch.Tensor, None]:
         """Forward pass of the non-attentional decoder RNN.
 
         Arguments:

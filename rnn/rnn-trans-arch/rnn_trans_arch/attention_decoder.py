@@ -9,8 +9,10 @@ from rnn_trans_arch.attention import (
 )
 
 
-class RNNAttentionDecoder(nn.Module):
-    def __init__(self, vocab_size, hidden_size, attention_type="scaled_dot"):
+class RNNAttentionDecoder(nn.Module):  # type: ignore
+    def __init__(
+        self, vocab_size: int, hidden_size: int, attention_type: str = "scaled_dot"
+    ):
         super(RNNAttentionDecoder, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -27,7 +29,9 @@ class RNNAttentionDecoder(nn.Module):
 
         self.out = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, inputs, annotations, hidden_init):
+    def forward(
+        self, inputs: torch.Tensor, annotations: torch.Tensor, hidden_init: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the attention-based decoder RNN.
 
         Arguments:
@@ -48,14 +52,6 @@ class RNNAttentionDecoder(nn.Module):
         attentions = []
         h_prev = hidden_init
         for i in range(seq_len):
-            # ------------
-            # FILL THIS IN
-            # ------------
-            # embed_current = ...
-            # context, attention_weights = ...
-            # embed_and_context = ...
-            # h_prev = ...
-
             embed_current = embed[:, i, :]
             context_res, attention_weights = self.attention(
                 queries=embed_current, keys=annotations, values=annotations

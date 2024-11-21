@@ -1,21 +1,39 @@
 import os
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from rnn_trans_arch.data_extraction import checkpoint, load_data, save_loss_plot, to_var
+from rnn_trans_arch.data_extraction import (
+    checkpoint,
+    load_data,
+    save_loss_plot,
+    to_var,
+)
+from rnn_trans_arch.data_types import AttrDict
+
 import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from torch.nn.modules.loss import _Loss
+from torch.optim.optimizer import Optimizer
 
 
-def string_to_index_list(s, char_to_index, end_token):
+def string_to_index_list(
+    string: str, char_to_index: dict[str, int], end_token: int
+) -> list[int]:
     """Converts a sentence into a list of indexes (for each character)."""
-    return [char_to_index[char] for char in s] + [
+    return [char_to_index[char] for char in string] + [
         end_token
     ]  # Adds the end token to each index list
 
 
-def translate_sentence(sentence, encoder, decoder, idx_dict, opts):
+def translate_sentence(
+    sentence: str,
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int] | None,
+    opts: AttrDict,
+) -> str:
     """Translates a sentence from English to Pig-Latin, by splitting the sentence into
     words (whitespace-separated), running the encoder-decoder model to translate each
     word independently, and then stitching the words back together with spaces between them.
@@ -27,13 +45,19 @@ def translate_sentence(sentence, encoder, decoder, idx_dict, opts):
     )
 
 
-def translate(input_string, encoder, decoder, idx_dict, opts):
+def translate(
+    input_string: str,
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    opts: AttrDict,
+) -> str:
     """Translates a given string from English to Pig-Latin."""
 
-    char_to_index = idx_dict["char_to_index"]
-    index_to_char = idx_dict["index_to_char"]
-    start_token = idx_dict["start_token"]
-    end_token = idx_dict["end_token"]
+    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
+    index_to_char: dict[int, str] = idx_dict["index_to_char"]  # type: ignore
+    start_token: int = idx_dict["start_token"]  # type: ignore
+    end_token: int = idx_dict["end_token"]  # type: ignore
 
     max_generated_chars = 20
     gen_string = ""
@@ -73,14 +97,20 @@ def translate(input_string, encoder, decoder, idx_dict, opts):
     return gen_string
 
 
-def visualize_attention(input_string, encoder, decoder, idx_dict, opts):
+def visualize_attention(
+    input_string: str,
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    opts: AttrDict,
+) -> str:
     """Generates a heatmap to show where attention is focused in each decoder step."""
     if idx_dict is None:
-        line_pairs, vocab_size, idx_dict = load_data()
-    char_to_index = idx_dict["char_to_index"]
-    index_to_char = idx_dict["index_to_char"]
-    start_token = idx_dict["start_token"]
-    end_token = idx_dict["end_token"]
+        _, _, idx_dict = load_data()
+    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
+    index_to_char: dict[int, str] = idx_dict["index_to_char"]  # type: ignore
+    start_token: int = idx_dict["start_token"]  # type: ignore
+    end_token: int = idx_dict["end_token"]  # type: ignore
 
     max_generated_chars = 20
     gen_string = ""
@@ -153,7 +183,15 @@ def visualize_attention(input_string, encoder, decoder, idx_dict, opts):
     return gen_string
 
 
-def compute_loss(data_dict, encoder, decoder, idx_dict, criterion, optimizer, opts):
+def compute_loss(
+    data_dict: dict[tuple[int, int], list[tuple[str, str]]],
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    criterion: _Loss,
+    optimizer: Optimizer,
+    opts: AttrDict,
+) -> float:
     """Train/Evaluate the model on a dataset.
 
     Arguments:
@@ -168,9 +206,9 @@ def compute_loss(data_dict, encoder, decoder, idx_dict, criterion, optimizer, op
     Returns:
         mean_loss: The average loss over all batches from data_dict.
     """
-    start_token = idx_dict["start_token"]
-    end_token = idx_dict["end_token"]
-    char_to_index = idx_dict["char_to_index"]
+    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
+    start_token: int = idx_dict["start_token"]  # type: ignore
+    end_token: int = idx_dict["end_token"]  # type: ignore
 
     losses = []
     for key in data_dict:
@@ -217,32 +255,32 @@ def compute_loss(data_dict, encoder, decoder, idx_dict, criterion, optimizer, op
             targets_flatten = targets.view(-1)
             loss = criterion(decoder_outputs_flatten, targets_flatten)
 
-            losses.append(loss.item())
+            losses.append(loss.item())  # type: ignore
 
             ## training if an optimizer is provided
             if optimizer:
                 # Zero gradients
                 optimizer.zero_grad()
                 # Compute gradients
-                loss.backward()
+                loss.backward()  # type: ignore
                 # Update the parameters of the encoder and decoder
                 optimizer.step()
 
-    mean_loss = np.mean(losses)
+    mean_loss: float = np.mean(losses)
     return mean_loss
 
 
 def training_loop(
-    train_dict,
-    val_dict,
-    idx_dict,
-    encoder,
-    decoder,
-    criterion,
-    optimizer,
-    opts,
-    test_sentence,
-):
+    train_dict: dict[tuple[int, int], list[tuple[str, str]]],
+    val_dict: dict[tuple[int, int], list[tuple[str, str]]],
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    encoder: nn.Module,
+    decoder: nn.Module,
+    criterion: _Loss,
+    optimizer: Optimizer,
+    opts: AttrDict,
+    test_sentence: str,
+) -> None:
     """Runs the main training loop; evaluates the model on the val set every epoch.
         * Prints training and val loss each epoch.
         * Prints qualitative translation results each epoch using TEST_SENTENCE
@@ -259,7 +297,7 @@ def training_loop(
         opts: The command-line arguments.
     """
 
-    loss_log = open(os.path.join(opts.checkpoint_path, "loss_log.txt"), "w")
+    loss_log = open(os.path.join(opts.checkpoint_dir, "loss_log.txt"), "w")
 
     best_val_loss = 1e6
     train_losses = []
@@ -294,7 +332,11 @@ def training_loop(
         save_loss_plot(train_losses, val_losses, opts)
 
 
-def print_data_stats(line_pairs, vocab_size, idx_dict):
+def print_data_stats(
+    line_pairs: list[tuple[str, str]],
+    vocab_size: int,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+) -> None:
     """Prints example word pairs, the number of data points, and the vocabulary."""
     print("=" * 80)
     print("Data Stats".center(80))
@@ -302,12 +344,12 @@ def print_data_stats(line_pairs, vocab_size, idx_dict):
     for pair in line_pairs[:5]:
         print(pair)
     print("Num unique word pairs: {}".format(len(line_pairs)))
-    print("Vocabulary: {}".format(idx_dict["char_to_index"].keys()))
+    print("Vocabulary: {}".format(idx_dict["char_to_index"].keys()))  # type: ignore
     print("Vocab size: {}".format(vocab_size))
     print("=" * 80)
 
 
-def print_opts(opts):
+def print_opts(opts: AttrDict) -> None:
     """Prints the values of all command-line arguments."""
     print("=" * 80)
     print("Opts".center(80))

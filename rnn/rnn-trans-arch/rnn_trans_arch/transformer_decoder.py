@@ -3,8 +3,8 @@ import torch.nn as nn
 from rnn_trans_arch.attention import CausalScaledDotAttention, ScaledDotAttention
 
 
-class TransformerDecoder(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_layers):
+class TransformerDecoder(nn.Module):  # type: ignore
+    def __init__(self, vocab_size: int, hidden_size: int, num_layers: int):
         super(TransformerDecoder, self).__init__()
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -39,7 +39,9 @@ class TransformerDecoder(nn.Module):
         )
         self.out = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, inputs, annotations, hidden_init):
+    def forward(
+        self, inputs: torch.Tensor, annotations: torch.Tensor, hidden_init: torch.Tensor
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """Forward pass of the attention-based decoder RNN.
 
         Arguments:
@@ -59,19 +61,6 @@ class TransformerDecoder(nn.Module):
         self_attention_weights_list = []
         contexts = embed
         for i in range(self.num_layers):
-            # ------------
-            # FILL THIS IN
-            # ------------
-            # new_contexts, self_attention_weights = ...
-            # residual_contexts = ...
-            # new_contexts, encoder_attention_weights = ...
-            # residual_contexts = ...
-            # new_contexts = ...
-            # contexts = ...
-
-            # ------------
-            # FILL THIS IN
-            # ------------
             new_contexts, self_attention_weights = self.self_attentions[i](
                 contexts, contexts, contexts
             )
