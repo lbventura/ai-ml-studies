@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-from rnn_trans_arch.gru_cell import MyGRUCell
 from rnn_trans_arch.attention import (
     AdditiveAttention,
     CausalScaledDotAttention,
@@ -19,7 +18,7 @@ class RNNAttentionDecoder(nn.Module):  # type: ignore
 
         self.embedding = nn.Embedding(vocab_size, hidden_size)
 
-        self.rnn = MyGRUCell(input_size=hidden_size * 2, hidden_size=hidden_size)
+        self.rnn = nn.GRUCell(input_size=hidden_size * 2, hidden_size=hidden_size)
         if attention_type == "additive":
             self.attention = AdditiveAttention(hidden_size=hidden_size)
         elif attention_type == "scaled_dot":
