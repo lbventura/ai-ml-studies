@@ -62,34 +62,6 @@ def create_dict(
     return d
 
 
-def read_pairs(filename: Path) -> tuple[list[str], list[str]]:
-    """Reads lines that consist of two words, separated by a space.
-
-    Returns:
-        source_words: A list of the first word in each line of the file.
-        target_words: A list of the second word in each line of the file.
-    """
-    lines = open(filename).read().strip().lower().split("\n")
-    source_words, target_words = [], []
-    for line in lines:
-        line = line.strip()
-        if line:
-            source, target = line.split()
-            source_words.append(source)
-            target_words.append(target)
-    return source_words, target_words
-
-
-def all_alpha_or_dash(string: str) -> bool:
-    """Helper function to check whether a string is alphabetic, allowing dashes '-'."""
-    return all(char.isalpha() or char == "-" for char in string)
-
-
-def filter_lines(lines: list[str]) -> list[str]:
-    """Filters lines to consist of only alphabetic characters or dashes "-"."""
-    return [line for line in lines if all_alpha_or_dash(line)]
-
-
 def load_data() -> (
     tuple[list[tuple[str, str]], int, dict[str, dict[str, int] | dict[int, str] | int]]
 ):
@@ -130,3 +102,31 @@ def load_data() -> (
     }
 
     return line_pairs, vocab_size, idx_dict
+
+
+def read_pairs(filename: Path) -> tuple[list[str], list[str]]:
+    """Reads lines that consist of two words, separated by a space.
+
+    Returns:
+        source_words: A list of the first word in each line of the file.
+        target_words: A list of the second word in each line of the file.
+    """
+    lines = open(filename).read().strip().lower().split("\n")
+    source_words, target_words = [], []
+    for line in lines:
+        line = line.strip()
+        if line:
+            source, target = line.split()
+            source_words.append(source)
+            target_words.append(target)
+    return source_words, target_words
+
+
+def filter_lines(lines: list[str]) -> list[str]:
+    """Filters lines to consist of only alphabetic characters or dashes "-"."""
+    return [line for line in lines if all_alpha_or_dash(line)]
+
+
+def all_alpha_or_dash(string: str) -> bool:
+    """Helper function to check whether a string is alphabetic, allowing dashes '-'."""
+    return all(char.isalpha() or char == "-" for char in string)

@@ -1,4 +1,5 @@
 import os
+from typing import cast
 import torch
 from rnn_trans_arch.data_types import DecoderType, ModelParams, TrainingParams
 from rnn_trans_arch.data_extraction import (
@@ -9,7 +10,8 @@ from rnn_trans_arch.data_extraction import (
 
 import torch.nn as nn
 import torch.optim as optim
-from rnn_trans_arch.gru import GRUEncoder, RNNDecoder
+from rnn_trans_arch.gru import GRUEncoder
+from rnn_trans_arch.rnn_decoder import RNNDecoder
 from rnn_trans_arch.attention_decoder import RNNAttentionDecoder
 from rnn_trans_arch.transformer_decoder import TransformerDecoder
 from rnn_trans_arch.training_utils import (
@@ -31,8 +33,12 @@ def train(
     dict[tuple[int, int], list[tuple[str, str]]],
     dict[str, dict[str, int] | dict[int, str] | int],
 ]:
+    # Load the data and print some stats/examples
     line_pairs, vocab_size, idx_dict = load_data()
-    print_data_stats(line_pairs, vocab_size, idx_dict)
+    char_to_index = cast(dict[str, int], idx_dict["char_to_index"])
+    print_data_stats(
+        line_pairs=line_pairs, vocab_size=vocab_size, char_to_index=char_to_index
+    )
 
     # Split the line pairs into an 80% train and 20% val split
     num_lines = len(line_pairs)
@@ -43,9 +49,7 @@ def train(
     train_dict = create_dict(train_pairs)
     val_dict = create_dict(val_pairs)
 
-    ##########################################################################
-    ### Setup: Create Encoder, Decoder, Learning Criterion, and Optimizers ###
-    ##########################################################################
+    # Model setup
     encoder = GRUEncoder(
         vocab_size=vocab_size,
         hidden_size=model_params.hidden_size,
@@ -72,7 +76,7 @@ def train(
     else:
         raise NotImplementedError
 
-    #### setup checkpoint path
+    # Define checkpoint path
     model_name = "h{}-bs{}-{}".format(
         model_params.hidden_size, training_params.batch_size, model_params.decoder_type
     )
@@ -91,6 +95,7 @@ def train(
         lr=training_params.learning_rate,
     )
 
+    # Train the model
     try:
         training_loop(
             train_dict=train_dict,
@@ -129,6 +134,7 @@ if __name__ == "__main__":
         test_dict,
         idx_dict,
     ) = train(training_params=training_params, model_params=model_params)
+
     translated = translate_sentence(
         TEST_SENTENCE,
         rnn_attn_encoder_scaled_dot,
@@ -136,5 +142,4 @@ if __name__ == "__main__":
         idx_dict,
         cuda=training_params.cuda,
     )
-
     print("source:\t\t{} \ntranslated:\t{}".format(TEST_SENTENCE, translated))

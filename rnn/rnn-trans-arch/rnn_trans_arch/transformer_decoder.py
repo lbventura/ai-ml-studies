@@ -17,7 +17,7 @@ class TransformerDecoder(nn.Module):  # type: ignore
                 CausalScaledDotAttention(
                     hidden_size=hidden_size,
                 )
-                for i in range(self.num_layers)
+                for _ in range(self.num_layers)
             ]
         )
         self.encoder_attentions = nn.ModuleList(
@@ -25,7 +25,7 @@ class TransformerDecoder(nn.Module):  # type: ignore
                 ScaledDotAttention(
                     hidden_size=hidden_size,
                 )
-                for i in range(self.num_layers)
+                for _ in range(self.num_layers)
             ]
         )
         self.attention_mlps = nn.ModuleList(
@@ -34,7 +34,7 @@ class TransformerDecoder(nn.Module):  # type: ignore
                     nn.Linear(hidden_size, hidden_size),
                     nn.ReLU(),
                 )
-                for i in range(self.num_layers)
+                for _ in range(self.num_layers)
             ]
         )
         self.out = nn.Linear(hidden_size, vocab_size)

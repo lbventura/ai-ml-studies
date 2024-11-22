@@ -3,6 +3,21 @@ import torch.nn as nn
 
 
 class MyGRUCell(nn.Module):  # type: ignore
+    """
+    A custom implementation of a Gated Recurrent Unit (GRU) cell.
+    This class defines the operations for a single GRU cell, which can be used
+    as a building block for constructing recurrent neural networks. The GRU cell
+    is designed to handle sequential data and maintain hidden state information
+    across time steps.
+    Note: This is not used neither in the GRU nor in the RNNDecoder, but it is useful for understanding how it works.
+    Attributes:
+        input_size (int): The number of input features.
+        hidden_size (int): The number of features in the hidden state.
+    Methods:
+        forward(x: torch.Tensor, h_prev: torch.Tensor) -> torch.Tensor:
+            Performs the forward pass of the GRU cell for one time step.
+    """
+
     def __init__(self, input_size: int, hidden_size: int) -> None:
         super(MyGRUCell, self).__init__()
 

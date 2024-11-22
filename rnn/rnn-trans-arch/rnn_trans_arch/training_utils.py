@@ -1,4 +1,5 @@
 import os
+from typing import cast
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,15 +16,6 @@ from torch.autograd import Variable
 import pickle as pkl
 
 
-def string_to_index_list(
-    string: str, char_to_index: dict[str, int], end_token: int
-) -> list[int]:
-    """Converts a sentence into a list of indexes (for each character)."""
-    return [char_to_index[char] for char in string] + [
-        end_token
-    ]  # Adds the end token to each index list
-
-
 def translate_sentence(
     sentence: str,
     encoder: nn.Module,
@@ -35,9 +27,13 @@ def translate_sentence(
     words (whitespace-separated), running the encoder-decoder model to translate each
     word independently, and then stitching the words back together with spaces between them.
     """
-    return " ".join(
-        [translate(word, encoder, decoder, idx_dict, cuda) for word in sentence.split()]
-    )
+
+    return_string = []
+    for word in sentence.split():
+        generated_word, _ = translate(word, encoder, decoder, idx_dict, cuda)
+        return_string.append(generated_word)  # Translates each word
+
+    return " ".join(return_string)
 
 
 def translate(
@@ -46,40 +42,51 @@ def translate(
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
     cuda: bool,
-) -> str:
-    """Translates a given string from English to Pig-Latin."""
+) -> tuple[str, torch.Tensor]:
+    """Translates a given string from English to Pig-Latin using the encoder and decoder."""
 
-    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
-    index_to_char: dict[int, str] = idx_dict["index_to_char"]  # type: ignore
-    start_token: int = idx_dict["start_token"]  # type: ignore
-    end_token: int = idx_dict["end_token"]  # type: ignore
+    char_to_index = cast(dict[str, int], idx_dict["char_to_index"])
+    index_to_char = cast(dict[int, str], idx_dict["index_to_char"])
+    start_token = cast(int, idx_dict["start_token"])
+    end_token = cast(int, idx_dict["end_token"])
 
     max_generated_chars = 20
     gen_string = ""
 
+    # Represent the input string as a list of indexes
     indexes = string_to_index_list(input_string, char_to_index, end_token)
     indexes = to_var(
         torch.LongTensor(indexes).unsqueeze(0), cuda
-    )  # Unsqueeze to make it like BS = 1
+    )  # Unsqueeze to make it like batch_size = 1
 
+    # Encode the input string
     encoder_annotations, encoder_last_hidden = encoder(indexes)
 
     decoder_hidden = encoder_last_hidden
-    decoder_input = to_var(torch.LongTensor([[start_token]]), cuda)  # For BS = 1
+    decoder_input = to_var(
+        torch.LongTensor([[start_token]]), cuda
+    )  # For batch_size = 1
+    # Initialize the decoder input with the start token
     decoder_inputs = decoder_input
 
-    for i in range(max_generated_chars):
-        ## slow decoding, recompute everything at each time
+    for _ in range(max_generated_chars):
+        # slow decoding, recompute everything at each time
+        # The alternative would be to store the previous generated words and only run the decoder for the last generated word
+        # This, however, assumes that only the last token in the decoder_inputs is different
         decoder_outputs, attention_weights = decoder(
             decoder_inputs, encoder_annotations, decoder_hidden
         )
-        generated_words = F.softmax(decoder_outputs, dim=2).max(2)[1]
+        # This softmax is required because the output layer of the decoder is linear
+        generated_words = F.softmax(decoder_outputs, dim=2).max(2)[
+            1
+        ]  # Finds the most likely index for a given token
+        # The 0th index contains the probablities of each token in the vocabulary
         ni = generated_words.cpu().numpy().reshape(-1)  # LongTensor of size 1
         ni = ni[-1]  # latest output token
 
         decoder_inputs = torch.cat([decoder_input, generated_words], dim=1)
 
-        if ni == end_token:
+        if ni == end_token:  # If the end token is generated, stop
             break
         else:
             gen_string = "".join(
@@ -89,7 +96,16 @@ def translate(
                 ]
             )
 
-    return gen_string
+    return gen_string, attention_weights
+
+
+def string_to_index_list(
+    string: str, char_to_index: dict[str, int], end_token: int
+) -> list[int]:
+    """Converts a sentence into a list of indexes (for each character)."""
+    return [char_to_index[char] for char in string] + [
+        end_token
+    ]  # Adds the end token to each index list
 
 
 def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
@@ -108,181 +124,6 @@ def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
         return Variable(tensor)
 
 
-def visualize_attention(
-    input_string: str,
-    encoder: nn.Module,
-    decoder: nn.Module,
-    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    cuda: bool,
-) -> str:
-    """Generates a heatmap to show where attention is focused in each decoder step."""
-    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
-    index_to_char: dict[int, str] = idx_dict["index_to_char"]  # type: ignore
-    start_token: int = idx_dict["start_token"]  # type: ignore
-    end_token: int = idx_dict["end_token"]  # type: ignore
-
-    max_generated_chars = 20
-    gen_string = ""
-
-    indexes = string_to_index_list(input_string, char_to_index, end_token)
-    indexes = to_var(
-        torch.LongTensor(indexes).unsqueeze(0), cuda
-    )  # Unsqueeze to make it like BS = 1
-
-    encoder_annotations, encoder_hidden = encoder(indexes)
-
-    decoder_hidden = encoder_hidden
-    decoder_input = to_var(torch.LongTensor([[start_token]]), cuda)  # For BS = 1
-    decoder_inputs = decoder_input
-
-    produced_end_token = False
-
-    for i in range(max_generated_chars):
-        ## slow decoding, recompute everything at each time
-        decoder_outputs, attention_weights = decoder(
-            decoder_inputs, encoder_annotations, decoder_hidden
-        )
-        generated_words = F.softmax(decoder_outputs, dim=2).max(2)[1]
-        ni = generated_words.cpu().numpy().reshape(-1)  # LongTensor of size 1
-        ni = ni[-1]  # latest output token
-
-        decoder_inputs = torch.cat([decoder_input, generated_words], dim=1)
-
-        if ni == end_token:
-            break
-        else:
-            gen_string = "".join(
-                [
-                    index_to_char[int(item)]
-                    for item in generated_words.cpu().numpy().reshape(-1)
-                ]
-            )
-
-    if isinstance(attention_weights, tuple):
-        ## transformer's attention mweights
-        attention_weights, self_attention_weights = attention_weights
-
-    all_attention_weights = attention_weights.data.cpu().numpy()
-
-    for i in range(len(all_attention_weights)):
-        attention_weights_matrix = all_attention_weights[i].squeeze()
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        cax = ax.matshow(attention_weights_matrix, cmap="bone")
-        fig.colorbar(cax)
-
-        # Set up axes
-        ax.set_yticklabels([""] + list(input_string) + ["EOS"], rotation=90)
-        ax.set_xticklabels(
-            [""] + list(gen_string) + (["EOS"] if produced_end_token else [])
-        )
-
-        # Show label at every tick
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-        # Add title
-        plt.xlabel("Attention weights to the source sentence in layer {}".format(i + 1))
-        plt.tight_layout()
-        plt.grid("off")
-        plt.show()
-        # plt.savefig(save)
-
-        # plt.close(fig)
-
-    return gen_string
-
-
-def compute_loss(
-    data_dict: dict[tuple[int, int], list[tuple[str, str]]],
-    encoder: nn.Module,
-    decoder: nn.Module,
-    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    criterion: _Loss,
-    optimizer: Optimizer,
-    training_params: TrainingParams,
-) -> float:
-    """Train/Evaluate the model on a dataset.
-
-    Arguments:
-        data_dict: The validation/test word pairs, organized by source and target lengths.
-        encoder: An encoder model to produce annotations for each step of the input sequence.
-        decoder: A decoder model (with or without attention) to generate output tokens.
-        idx_dict: Contains char-to-index and index-to-char mappings, and start & end token indexes.
-        criterion: Used to compute the CrossEntropyLoss for each decoder output.
-        optimizer: Train the weights if an optimizer is given. None if only evaluate the model.
-        training_params: The training parameters.
-
-    Returns:
-        mean_loss: The average loss over all batches from data_dict.
-    """
-    char_to_index: dict[str, int] = idx_dict["char_to_index"]  # type: ignore
-    start_token: int = idx_dict["start_token"]  # type: ignore
-    end_token: int = idx_dict["end_token"]  # type: ignore
-
-    losses = []
-    for key in data_dict:
-        input_strings, target_strings = zip(*data_dict[key])
-        input_tensors = [
-            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
-            for s in input_strings
-        ]
-        target_tensors = [
-            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
-            for s in target_strings
-        ]
-
-        num_tensors = len(input_tensors)
-        num_batches = int(np.ceil(num_tensors / float(training_params.batch_size)))
-
-        for i in range(num_batches):
-            start = i * training_params.batch_size
-            end = start + training_params.batch_size
-
-            inputs = to_var(torch.stack(input_tensors[start:end]), training_params.cuda)
-            targets = to_var(
-                torch.stack(target_tensors[start:end]), training_params.cuda
-            )
-
-            # The batch size may be different in each epoch
-            BS = inputs.size(0)
-
-            encoder_annotations, encoder_hidden = encoder(inputs)
-
-            start_vector = (
-                torch.ones(BS).long().unsqueeze(1) * start_token
-            )  # BS x 1 --> 16x1  CHECKED
-            decoder_input = to_var(
-                start_vector, training_params.cuda
-            )  # BS x 1 --> 16x1  CHECKED
-
-            loss = 0.0
-
-            decoder_inputs = torch.cat(
-                [decoder_input, targets[:, 0:-1]], dim=1
-            )  # Gets decoder inputs by shifting the targets to the right
-
-            decoder_outputs, attention_weights = decoder(
-                decoder_inputs, encoder_annotations, encoder_hidden
-            )
-            decoder_outputs_flatten = decoder_outputs.view(-1, decoder_outputs.size(2))
-            targets_flatten = targets.view(-1)
-            loss = criterion(decoder_outputs_flatten, targets_flatten)
-
-            losses.append(loss.item())  # type: ignore
-
-            ## training if an optimizer is provided
-            if optimizer:
-                # Zero gradients
-                optimizer.zero_grad()
-                # Compute gradients
-                loss.backward()  # type: ignore
-                # Update the parameters of the encoder and decoder
-                optimizer.step()
-
-    mean_loss: float = np.mean(losses)
-    return mean_loss
-
-
 def training_loop(
     train_dict: dict[tuple[int, int], list[tuple[str, str]]],
     val_dict: dict[tuple[int, int], list[tuple[str, str]]],
@@ -297,8 +138,7 @@ def training_loop(
 ) -> None:
     """Runs the main training loop; evaluates the model on the val set every epoch.
         * Prints training and val loss each epoch.
-        * Prints qualitative translation results each epoch using TEST_SENTENCE
-        * Saves an attention map for TEST_WORD_ATTN each epoch
+        * Prints qualitative translation results each epoch using test_sentence.
 
     Arguments:
         train_dict: The training word pairs, organized by source and target lengths.
@@ -312,63 +152,164 @@ def training_loop(
         model_params: The model parameters.
     """
 
-    loss_log = open(os.path.join(training_params.checkpoint_dir, "loss_log.txt"), "w")
+    with open(
+        os.path.join(training_params.checkpoint_dir, "loss_log.txt"), "w"
+    ) as loss_log:
+        best_val_loss = 1e6
+        _tol = 0.05
+        train_losses = []
+        val_losses = []
 
-    best_val_loss = 1e6
-    train_losses = []
-    val_losses = []
+        for epoch in range(training_params.nepochs):
+            # Decay the learning rate every epoch
+            optimizer.param_groups[0]["lr"] *= training_params.lr_decay
 
-    for epoch in range(training_params.nepochs):
-        optimizer.param_groups[0]["lr"] *= training_params.lr_decay
-
-        train_loss = compute_loss(
-            train_dict,
-            encoder,
-            decoder,
-            idx_dict,
-            criterion,
-            optimizer,
-            training_params=training_params,
-        )
-        val_loss = compute_loss(
-            val_dict,
-            encoder,
-            decoder,
-            idx_dict,
-            criterion,
-            None,
-            training_params=training_params,
-        )
-
-        if val_loss < best_val_loss:
-            checkpoint(
+            train_loss = compute_loss(
+                train_dict,
                 encoder,
                 decoder,
                 idx_dict,
-                checkpoint_dir=training_params.checkpoint_dir,
+                criterion,
+                optimizer,
+                training_params=training_params,
+            )
+            val_loss = compute_loss(
+                val_dict,
+                encoder,
+                decoder,
+                idx_dict,
+                criterion,
+                None,
+                training_params=training_params,
             )
 
-        gen_string = translate_sentence(
-            test_sentence, encoder, decoder, idx_dict, cuda=training_params.cuda
-        )
-        print(
-            "Epoch: {:3d} | Train loss: {:.3f} | Val loss: {:.3f} | Gen: {:20s}".format(
-                epoch, train_loss, val_loss, gen_string
+            if val_loss < best_val_loss and epoch % 5 == 0:
+                best_val_loss = val_loss + _tol
+                checkpoint(
+                    encoder,
+                    decoder,
+                    idx_dict,
+                    checkpoint_dir=training_params.checkpoint_dir,
+                )
+
+            if epoch % 5 == 0:  # translate a test sentence every 5 epochs
+                gen_string = translate_sentence(
+                    test_sentence, encoder, decoder, idx_dict, cuda=training_params.cuda
+                )
+                print(
+                    "Epoch: {:3d} | Train loss: {:.3f} | Val loss: {:.3f} | Gen: {:20s}".format(
+                        epoch, train_loss, val_loss, gen_string
+                    )
+                )
+
+            loss_log.write("{} {} {}\n".format(epoch, train_loss, val_loss))
+            loss_log.flush()
+
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
+
+            save_loss_plot(
+                train_losses,
+                val_losses,
+                training_params=training_params,
+                model_params=model_params,
             )
-        )
 
-        loss_log.write("{} {} {}\n".format(epoch, train_loss, val_loss))
-        loss_log.flush()
 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+def compute_loss(
+    data_dict: dict[tuple[int, int], list[tuple[str, str]]],
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    criterion: _Loss,
+    optimizer: Optimizer | None,
+    training_params: TrainingParams,
+) -> float:
+    """Train/Evaluate the model on a dataset.
 
-        save_loss_plot(
-            train_losses,
-            val_losses,
-            training_params=training_params,
-            model_params=model_params,
-        )
+    Arguments:
+        data_dict: The validation/test word pairs, organized by source and target lengths. For example, data_dict[(5, 10)] = [('a-day', 'away-ayday')]
+        encoder: An encoder model to produce annotations for each step of the input sequence.
+        decoder: A decoder model (with or without attention) to generate output tokens.
+        idx_dict: Contains char-to-index and index-to-char mappings, and start & end token indexes.
+        criterion: Used to compute the loss for each decoder output.
+        optimizer: Train the weights if an optimizer is given. None if only evaluate the model.
+        training_params: The training parameters.
+
+    Returns:
+        mean_loss: The average loss over all batches from data_dict.
+    """
+    char_to_index = cast(dict[str, int], idx_dict["char_to_index"])
+    start_token = cast(int, idx_dict["start_token"])
+    end_token = cast(int, idx_dict["end_token"])
+
+    losses = []
+    for key in data_dict:
+        input_strings, target_strings = zip(*data_dict[key])
+        input_tensors = [
+            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
+            for s in input_strings
+        ]  # one tensor per input string
+        target_tensors = [
+            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
+            for s in target_strings
+        ]
+
+        num_batches = int(
+            np.ceil(len(input_tensors) / float(training_params.batch_size))
+        )  # TODO: It could happen that some batches are very small, is this a problem?
+
+        for i in range(num_batches):
+            start = i * training_params.batch_size
+            end = start + training_params.batch_size
+
+            inputs = to_var(torch.stack(input_tensors[start:end]), training_params.cuda)
+            targets = to_var(
+                torch.stack(target_tensors[start:end]), training_params.cuda
+            )  # batch_size x seq_len + 1
+
+            # The batch size may be different in each epoch
+            batch_size = inputs.size(0)
+
+            # The encoder gets the input strings and produces annotations, as well as the internal hidden states
+            # The idea here is similar to a VAE, where the encoder produces a latent representation of the input
+            encoder_annotations, encoder_hidden = encoder(inputs)
+
+            start_vector = (
+                torch.ones(batch_size).long().unsqueeze(1) * start_token
+            )  # batch_size x 1
+            decoder_input = to_var(start_vector, training_params.cuda)  # batch_size x 1
+
+            loss = 0.0
+
+            shifted_targets = torch.cat(
+                [decoder_input, targets[:, 0:-1]], dim=1
+            )  # Gets decoder inputs by shifting the targets to the right
+            # See Figure 1 of Assignment 3 here http://www.cs.toronto.edu/~rgrosse/courses/csc421_2019/assignments/assignment3.pdf
+
+            # The decoder gets the target strings, encoder annotations, and the encoder hidden states
+            decoder_outputs, _ = decoder(
+                shifted_targets, encoder_annotations, encoder_hidden
+            )  # Remember that the decoder outputs are the unnormalized scores, not the softmax probabilities
+            decoder_outputs_flatten = decoder_outputs.view(
+                -1, decoder_outputs.size(2)
+            )  # This is required to compute the loss
+            targets_flatten = targets.view(-1)
+            loss = criterion(decoder_outputs_flatten, targets_flatten)
+
+            losses.append(loss.item())  # type: ignore
+
+            ## If an optimizer is provided, then the model is in training mode
+            if optimizer:
+                # Zero gradients
+                optimizer.zero_grad()
+                # Compute gradients
+                loss.backward()  # type: ignore
+                # Update the parameters of the encoder and decoder
+                optimizer.step()
+
+    mean_loss: float = np.mean(losses)
+    return mean_loss
 
 
 def checkpoint(
@@ -394,7 +335,7 @@ def checkpoint(
 def print_data_stats(
     line_pairs: list[tuple[str, str]],
     vocab_size: int,
-    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    char_to_index: dict[str, int],
 ) -> None:
     """Prints example word pairs, the number of data points, and the vocabulary."""
     print("=" * 80)
@@ -403,7 +344,7 @@ def print_data_stats(
     for pair in line_pairs[:5]:
         print(pair)
     print("Num unique word pairs: {}".format(len(line_pairs)))
-    print("Vocabulary: {}".format(idx_dict["char_to_index"].keys()))  # type: ignore
+    print("Vocabulary: {}".format(char_to_index.keys()))
     print("Vocab size: {}".format(vocab_size))
     print("=" * 80)
 
@@ -419,7 +360,9 @@ def save_loss_plot(
     plt.plot(range(len(train_losses)), train_losses)
     plt.plot(range(len(val_losses)), val_losses)
     plt.title(
-        "BS={}, nhid={}".format(training_params.batch_size, model_params.hidden_size),
+        "batch_size={}, nhid={}".format(
+            training_params.batch_size, model_params.hidden_size
+        ),
         fontsize=20,
     )
     plt.xlabel("Epochs", fontsize=16)
@@ -429,3 +372,48 @@ def save_loss_plot(
     plt.tight_layout()
     plt.savefig(os.path.join(training_params.checkpoint_dir, "loss_plot.pdf"))
     plt.close()
+
+
+def visualize_attention(
+    input_string: str,
+    encoder: nn.Module,
+    decoder: nn.Module,
+    idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
+    cuda: bool,
+) -> str:
+    """Generates a heatmap to show where attention is focused in each decoder step."""
+    gen_string, attention_weights = translate(
+        input_string=input_string,
+        encoder=encoder,
+        decoder=decoder,
+        idx_dict=idx_dict,
+        cuda=cuda,
+    )
+
+    if isinstance(attention_weights, tuple):
+        ## transformer's attention weights
+        attention_weights, _ = attention_weights
+
+    all_attention_weights = attention_weights.data.cpu().numpy()
+
+    for i in range(len(all_attention_weights)):
+        attention_weights_matrix = all_attention_weights[i].squeeze()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(attention_weights_matrix, cmap="bone")
+        fig.colorbar(cax)
+
+        # Set up axes
+        ax.set_yticklabels([""] + list(input_string) + ["EOS"], rotation=90)
+        ax.set_xticklabels([""] + list(gen_string))
+
+        # Show label at every tick
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+        # Add title
+        plt.xlabel("Attention weights to the source sentence in layer {}".format(i + 1))
+        plt.tight_layout()
+        plt.grid("off")
+        plt.show()
+
+    return gen_string
