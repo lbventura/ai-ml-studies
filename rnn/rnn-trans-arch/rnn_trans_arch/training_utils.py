@@ -293,13 +293,16 @@ def compute_loss(
             )  # Remember that the decoder outputs are the unnormalized scores, not the softmax probabilities
             decoder_outputs_flatten = decoder_outputs.view(
                 -1, decoder_outputs.size(2)
-            )  # This is required to compute the loss
-            targets_flatten = targets.view(-1)
+            )  # This changes the shape from batch_size x seq_len x vocab_size to batch_size*seq_len x vocab_size
+            # This is necessary to compute the loss, which expects a 2D tensor
+            targets_flatten = targets.view(
+                -1
+            )  # This changes the shape from batch_size x seq_len to batch_size*seq_len
             loss = criterion(decoder_outputs_flatten, targets_flatten)
 
             losses.append(loss.item())  # type: ignore
 
-            ## If an optimizer is provided, then the model is in training mode
+            # If an optimizer is provided, then the model is in training mode
             if optimizer:
                 # Zero gradients
                 optimizer.zero_grad()

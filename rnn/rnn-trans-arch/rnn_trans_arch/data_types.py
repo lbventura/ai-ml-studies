@@ -5,7 +5,7 @@ from enum import StrEnum
 @dataclass
 class TrainingParams:
     cuda: bool = False
-    nepochs: int = 50
+    nepochs: int = 75
     checkpoint_dir: str = "checkpoints"
     learning_rate: float = 0.005
     lr_decay: float = 0.99
