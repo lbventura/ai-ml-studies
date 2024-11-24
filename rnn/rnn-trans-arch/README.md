@@ -8,4 +8,6 @@ The goal is to translate Pig Latin to English. Pig Latin is a language game that
 
 ## Results Summary
 
+## Architecture
+
 For more details about the architecture, check the `architecture.md` file.
