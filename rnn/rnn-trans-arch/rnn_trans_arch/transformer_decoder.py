@@ -60,7 +60,7 @@ class TransformerDecoder(nn.Module):  # type: ignore
         encoder_attention_weights_list = []
         self_attention_weights_list = []
         contexts = embed
-        for i in range(self.num_layers):
+        for i in range(self.num_layers):  # TODO: Can we remove this for loop?
             new_contexts, self_attention_weights = self.self_attentions[i](
                 contexts, contexts, contexts
             )
