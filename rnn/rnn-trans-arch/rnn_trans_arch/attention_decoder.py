@@ -35,8 +35,7 @@ class RNNAttentionDecoder(nn.Module):  # type: ignore
 
         Arguments:
             inputs: Input token indexes across a batch for all the time step. (batch_size x decoder_seq_len)
-            annotations: The encoder hidden states for each step of the input.
-                         sequence. (batch_size x seq_len x hidden_size)
+            annotations: The encoder hidden states for each step of the input sequence. (batch_size x seq_len x hidden_size)
             hidden_init: The final hidden states from the encoder, across a batch. (batch_size x hidden_size)
 
         Returns:
@@ -44,7 +43,7 @@ class RNNAttentionDecoder(nn.Module):  # type: ignore
             attentions: The stacked attention weights applied to the encoder annotations (batch_size x encoder_seq_len x decoder_seq_len)
         """
 
-        batch_size, seq_len = inputs.size()
+        _, seq_len = inputs.size()
         embed = self.embedding(inputs)  # batch_size x seq_len x hidden_size
 
         hiddens = []

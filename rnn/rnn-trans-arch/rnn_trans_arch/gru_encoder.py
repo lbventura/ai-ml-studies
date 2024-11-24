@@ -27,7 +27,7 @@ class GRUEncoder(nn.Module):  # type: ignore
         """
 
         batch_size, seq_len = inputs.size()
-        hidden = self.init_hidden(batch_size)
+        hidden = self.init_hidden(batch_size)  # initialize the hidden state
 
         encoded = self.embedding(inputs)  # batch_size x seq_len x hidden_size
         annotations = []

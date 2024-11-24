@@ -27,7 +27,7 @@ class RNNDecoder(nn.Module):  # type: ignore
             output: Un-normalized scores for each token in the vocabulary, across a batch for all the decoding time steps. (batch_size x decoder_seq_len x vocab_size)
             None
         """
-        batch_size, seq_len = inputs.size()
+        _, seq_len = inputs.size()
         embed = self.embedding(inputs)  # batch_size x seq_len x hidden_size
 
         hiddens = []
