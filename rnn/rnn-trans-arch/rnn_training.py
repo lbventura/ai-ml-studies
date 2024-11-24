@@ -1,8 +1,13 @@
 import os
 from typing import cast
 import torch
-from rnn_trans_arch.data_types import DecoderType, ModelParams, TrainingParams
+from rnn_trans_arch.data_types import (
+    DecoderType,
+    ModelParams,
+    TrainingParams,
+)
 from rnn_trans_arch.data_extraction import (
+    DATA_TYPE,
     get_file,
     load_data,
     create_dict,
@@ -10,7 +15,7 @@ from rnn_trans_arch.data_extraction import (
 
 import torch.nn as nn
 import torch.optim as optim
-from rnn_trans_arch.gru import GRUEncoder
+from rnn_trans_arch.gru_encoder import GRUEncoder
 from rnn_trans_arch.rnn_decoder import RNNDecoder
 from rnn_trans_arch.attention_decoder import RNNAttentionDecoder
 from rnn_trans_arch.transformer_decoder import TransformerDecoder
@@ -19,6 +24,7 @@ from rnn_trans_arch.training_utils import (
     training_loop,
     translate_sentence,
 )
+from pathlib import Path
 
 TEST_SENTENCE = "the air conditioning is working"
 
@@ -77,10 +83,13 @@ def train(
         raise NotImplementedError
 
     # Define checkpoint path
-    model_name = "h{}-bs{}-{}".format(
-        model_params.hidden_size, training_params.batch_size, model_params.decoder_type
-    )
-    training_params.checkpoint_dir = model_name
+    current_path = Path(__file__).parent
+    input_data_type = DATA_TYPE.split(".")[0]
+
+    output_path = current_path / "output" / input_data_type
+    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}"
+    training_params.checkpoint_dir = f"{str(output_path)}/{model_name}"
+
     if not os.path.exists(training_params.checkpoint_dir):
         os.makedirs(training_params.checkpoint_dir)
 
