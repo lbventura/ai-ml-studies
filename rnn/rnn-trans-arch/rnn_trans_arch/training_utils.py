@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import cast
 import torch
 import torch.nn as nn
@@ -23,7 +24,7 @@ def translate_sentence(
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
     cuda: bool,
 ) -> str:
-    """Translates a sentence from English to Pig-Latin, by splitting the sentence into
+    """Translates a sentence by splitting the sentence into
     words (whitespace-separated), running the encoder-decoder model to translate each
     word independently, and then stitching the words back together with spaces between them.
     """
@@ -43,7 +44,7 @@ def translate(
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
     cuda: bool,
 ) -> tuple[str, torch.Tensor]:
-    """Translates a given string from English to Pig-Latin using the encoder and decoder."""
+    """Translates a given string using the encoder and decoder."""
 
     char_to_index = cast(dict[str, int], idx_dict["char_to_index"])
     index_to_char = cast(dict[int, str], idx_dict["index_to_char"])
@@ -53,10 +54,10 @@ def translate(
     max_generated_chars = 20
     gen_string = ""
 
-    # Represent the input string as a list of indexes
-    indexes = string_to_index_list(input_string, char_to_index, end_token)
+    # Represent the input string as a list of indexes and convert it to a tensor
+    indexes = string_to_index_tensor(input_string, char_to_index, end_token)
     indexes = to_var(
-        torch.LongTensor(indexes).unsqueeze(0), cuda
+        indexes.unsqueeze(0), cuda
     )  # Unsqueeze to make it like batch_size = 1
 
     # Encode the input string
@@ -99,13 +100,13 @@ def translate(
     return gen_string, attention_weights
 
 
-def string_to_index_list(
+def string_to_index_tensor(
     string: str, char_to_index: dict[str, int], end_token: int
-) -> list[int]:
-    """Converts a sentence into a list of indexes (for each character)."""
-    return [char_to_index[char] for char in string] + [
-        end_token
-    ]  # Adds the end token to each index list
+) -> torch.Tensor:
+    """Converts a sentence into a tensor of indices (one for each character).
+    The end token is added to each index list.
+    """
+    return torch.LongTensor([char_to_index[char] for char in string] + [end_token])
 
 
 def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
@@ -247,12 +248,10 @@ def compute_loss(
     for key in data_dict:
         input_strings, target_strings = zip(*data_dict[key])
         input_tensors = [
-            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
-            for s in input_strings
+            string_to_index_tensor(s, char_to_index, end_token) for s in input_strings
         ]  # one tensor per input string
         target_tensors = [
-            torch.LongTensor(string_to_index_list(s, char_to_index, end_token))
-            for s in target_strings
+            string_to_index_tensor(s, char_to_index, end_token) for s in target_strings
         ]
 
         num_batches = int(
@@ -420,3 +419,14 @@ def visualize_attention(
         plt.show()
 
     return gen_string
+
+
+def set_checkpoint_path(
+    current_path: Path, training_params: TrainingParams, model_params: ModelParams
+) -> None:
+    """Set the checkpoint path on the training_params to store model results."""
+    input_data_type = training_params.data_source.split(".")[0]
+    output_path = current_path / "output" / input_data_type
+    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}"
+
+    training_params.checkpoint_dir = f"{str(output_path)}/{model_name}"

@@ -7,7 +7,6 @@ from rnn_trans_arch.data_types import (
     TrainingParams,
 )
 from rnn_trans_arch.data_extraction import (
-    DATA_TYPE,
     get_file,
     load_data,
     create_dict,
@@ -21,6 +20,7 @@ from rnn_trans_arch.attention_decoder import RNNAttentionDecoder
 from rnn_trans_arch.transformer_decoder import TransformerDecoder
 from rnn_trans_arch.training_utils import (
     print_data_stats,
+    set_checkpoint_path,
     training_loop,
     translate_sentence,
 )
@@ -40,7 +40,9 @@ def train(
     dict[str, dict[str, int] | dict[int, str] | int],
 ]:
     # Load the data and print some stats/examples
-    line_pairs, vocab_size, idx_dict = load_data()
+    line_pairs, vocab_size, idx_dict = load_data(
+        data_source=training_params.data_source
+    )
     char_to_index = cast(dict[str, int], idx_dict["char_to_index"])
     print_data_stats(
         line_pairs=line_pairs, vocab_size=vocab_size, char_to_index=char_to_index
@@ -84,11 +86,11 @@ def train(
 
     # Define checkpoint path
     current_path = Path(__file__).parent
-    input_data_type = DATA_TYPE.split(".")[0]
-
-    output_path = current_path / "output" / input_data_type
-    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}"
-    training_params.checkpoint_dir = f"{str(output_path)}/{model_name}"
+    set_checkpoint_path(
+        current_path=current_path,
+        training_params=training_params,
+        model_params=model_params,
+    )
 
     if not os.path.exists(training_params.checkpoint_dir):
         os.makedirs(training_params.checkpoint_dir)
@@ -127,11 +129,13 @@ def train(
 
 if __name__ == "__main__":
     torch.manual_seed(1)
-    training_params = TrainingParams()
+
+    data_source = "pig_latin_data.txt"
+    training_params = TrainingParams(data_source=data_source)
     model_params = ModelParams()
 
     data_fpath = get_file(
-        fname="pig_latin_data.txt",
+        fname=data_source,
         origin="http://www.cs.toronto.edu/~jba/pig_latin_data.txt",
         untar=False,
     )

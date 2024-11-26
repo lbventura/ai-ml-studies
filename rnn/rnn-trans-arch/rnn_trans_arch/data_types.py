@@ -4,6 +4,7 @@ from enum import StrEnum
 
 @dataclass
 class TrainingParams:
+    data_source: str
     cuda: bool = False
     nepochs: int = 75
     checkpoint_dir: str = "checkpoints"

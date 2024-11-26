@@ -7,8 +7,6 @@ from collections import defaultdict
 from six.moves.urllib.request import urlretrieve  # type: ignore
 import tarfile
 
-DATA_TYPE = "pig_latin_data.txt"
-
 
 def get_file(
     fname: str,
@@ -64,11 +62,15 @@ def create_dict(
     return d
 
 
-def load_data() -> (
-    tuple[list[tuple[str, str]], int, dict[str, dict[str, int] | dict[int, str] | int]]
-):
-    """Loads (English, Pig-Latin) word pairs, and creates mappings from characters to indexes."""
-    datadir = Path(__file__).parent.parent / "data" / DATA_TYPE
+def load_data(
+    data_source: str,
+) -> tuple[
+    list[tuple[str, str]], int, dict[str, dict[str, int] | dict[int, str] | int]
+]:
+    """Loads input word pairs, and creates mappings from characters to indexes.
+    One example is the (English, Pig-Latin) word pairs when the data_source is "pig_latin_data.txt".
+    """
+    datadir = Path(__file__).parent.parent / "data" / data_source
     source_lines, target_lines = read_pairs(datadir)
 
     # Filter lines
