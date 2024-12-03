@@ -148,20 +148,13 @@ class CausalScaledDotAttention(nn.Module):  # type: ignore
             batch_size, seq_len, hidden_size
         )  # batch_size x seq_len x hidden_size
 
-        # my answer
-        # unnormalized_attention = torch.bmm(k, q.transpose(1,2)) #batch_size x seq_len x k
-
         # solution answer
         unnormalized_attention = self.scaling_factor * torch.bmm(
             k, q.transpose(1, 2)
         )  # batch_size x seq_len x k
-        # I think this function is only used in self-attention, where q,k,v have same dimention. k = seq_len
 
-        # TODO: This has some problem with the dimensions, as it should be batch_size x seq_len x k
-        # but when it is used in the Decoder, it is size batch_size x seq_len x k
-        mask = torch.tril(
-            torch.ones(batch_size, seq_len, seq_len, dtype=torch.uint8)
-        ).transpose(1, 2)
+        mask = torch.triu(torch.ones(batch_size, seq_len, seq_len, dtype=torch.uint8))
+
         unnormalized_attention[mask == 0] = self.neg_inf
         attention_weights = self.softmax(unnormalized_attention)
         context = torch.bmm(attention_weights.transpose(1, 2), v)
