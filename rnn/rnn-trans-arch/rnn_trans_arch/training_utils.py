@@ -51,15 +51,35 @@ def translate(
     start_token = cast(int, idx_dict["start_token"])
     end_token = cast(int, idx_dict["end_token"])
 
-    max_generated_chars = 20
-    gen_string = ""
-
     # Represent the input string as a list of indexes and convert it to a tensor
     indexes = string_to_index_tensor(input_string, char_to_index, end_token)
     indexes = to_var(
         indexes.unsqueeze(0), cuda
     )  # Unsqueeze to make it like batch_size = 1
 
+    generated_tensor, attention_weights = run_encoder_decoder(
+        indexes, encoder, decoder, start_token, end_token, cuda
+    )
+
+    gen_string = "".join(
+        [
+            index_to_char[int(item)]
+            for item in generated_tensor.cpu().numpy().reshape(-1)
+            if index_to_char[int(item)] != "EOS"
+        ]
+    )
+
+    return gen_string, attention_weights
+
+
+def run_encoder_decoder(
+    indexes: torch.Tensor,
+    encoder: nn.Module,
+    decoder: nn.Module,
+    start_token: int,
+    end_token: int,
+    cuda: bool,
+) -> tuple[torch.Tensor, torch.Tensor]:
     # Encode the input string
     encoder_annotations, encoder_last_hidden = encoder(indexes)
 
@@ -70,6 +90,7 @@ def translate(
     # Initialize the decoder input with the start token
     decoder_inputs = decoder_input
 
+    max_generated_chars = 20
     for _ in range(max_generated_chars):
         # slow decoding, recompute everything at each time
         # The alternative would be to store the previous generated words and only run the decoder for the last generated word
@@ -78,26 +99,18 @@ def translate(
             decoder_inputs, encoder_annotations, decoder_hidden
         )
         # This softmax is required because the output layer of the decoder is linear
-        generated_words = F.softmax(decoder_outputs, dim=2).max(2)[
+        generated_tensor = F.softmax(decoder_outputs, dim=2).max(2)[
             1
         ]  # Finds the most likely index for a given token
         # The 0th index contains the probablities of each token in the vocabulary
-        ni = generated_words.cpu().numpy().reshape(-1)  # LongTensor of size 1
+        ni = generated_tensor.cpu().numpy().reshape(-1)  # LongTensor of size 1
         ni = ni[-1]  # latest output token
 
-        decoder_inputs = torch.cat([decoder_input, generated_words], dim=1)
+        decoder_inputs = torch.cat([decoder_input, generated_tensor], dim=1)
 
         if ni == end_token:  # If the end token is generated, stop
             break
-        else:
-            gen_string = "".join(
-                [
-                    index_to_char[int(item)]
-                    for item in generated_words.cpu().numpy().reshape(-1)
-                ]
-            )
-
-    return gen_string, attention_weights
+    return generated_tensor, attention_weights
 
 
 def string_to_index_tensor(
