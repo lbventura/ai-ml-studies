@@ -49,8 +49,9 @@ def train(
     )
 
     # Split the line pairs into an 80% train and 20% val split
+    training_data_percentage = 0.8
     num_lines = len(line_pairs)
-    num_train = int(0.8 * num_lines)
+    num_train = int(training_data_percentage * num_lines)
     train_pairs, val_pairs = line_pairs[:num_train], line_pairs[num_train:]
 
     # Group the data by the lengths of the source and target words, to form batches
