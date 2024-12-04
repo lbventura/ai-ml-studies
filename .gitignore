@@ -5,4 +5,5 @@ cnn-arch/cnn/__pycache__/
 rnn/rnn-trans-arch/rnn_trans_arch/__pycache__/
 rnn/rnn-trans-arch/data
 rnn/rnn-trans-arch/output
+rnn/rnn-trans-arch/runs
 rl

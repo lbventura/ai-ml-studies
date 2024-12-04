@@ -13,8 +13,13 @@ import matplotlib.ticker as ticker
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 
 import pickle as pkl
+
+parent_path = Path(__file__).parent.parent
+
+WRITER = SummaryWriter(parent_path / "runs/parameter_updates")
 
 
 def translate_sentence(
@@ -165,6 +170,10 @@ def training_loop(
         training_params: The training parameters.
         model_params: The model parameters.
     """
+    # Starting decoder parameters
+    dec_params = {
+        name: param.data.clone() for name, param in decoder.named_parameters()
+    }
 
     with open(
         os.path.join(training_params.checkpoint_dir, "loss_log.txt"), "w"
@@ -187,6 +196,16 @@ def training_loop(
                 optimizer,
                 training_params=training_params,
             )
+
+            # register parameters
+            for name, param in decoder.named_parameters():
+                delta = param.data - dec_params[name]
+                normalized_norm = torch.norm(delta) / (
+                    torch.abs(param.data.mean()) + 1e-7
+                )
+                WRITER.add_scalar(f"Parameter Updates/{name}", normalized_norm, epoch)
+                dec_params[name] = param.data.clone()
+
             val_loss = compute_loss(
                 val_dict,
                 encoder,
@@ -440,6 +459,6 @@ def set_checkpoint_path(
     """Set the checkpoint path on the training_params to store model results."""
     input_data_type = training_params.data_source.split(".")[0]
     output_path = current_path / "output" / input_data_type
-    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}"
+    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}-{model_params.attention_type}"
 
     training_params.checkpoint_dir = f"{str(output_path)}/{model_name}"
