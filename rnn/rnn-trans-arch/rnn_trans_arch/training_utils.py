@@ -88,7 +88,6 @@ def run_encoder_decoder(
     # Encode the input string
     encoder_annotations, encoder_last_hidden = encoder(indexes)
 
-    decoder_hidden = encoder_last_hidden
     decoder_input = to_var(
         torch.LongTensor([[start_token]]), cuda
     )  # For batch_size = 1
@@ -101,7 +100,7 @@ def run_encoder_decoder(
         # The alternative would be to store the previous generated words and only run the decoder for the last generated word
         # This, however, assumes that only the last token in the decoder_inputs is different
         decoder_outputs, attention_weights = decoder(
-            decoder_inputs, encoder_annotations, decoder_hidden
+            decoder_inputs, encoder_annotations, encoder_last_hidden
         )
         # This softmax is required because the output layer of the decoder is linear
         generated_tensor = F.softmax(decoder_outputs, dim=2).max(2)[
