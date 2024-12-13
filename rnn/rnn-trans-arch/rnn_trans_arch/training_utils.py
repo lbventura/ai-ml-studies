@@ -458,6 +458,6 @@ def set_checkpoint_path(
     """Set the checkpoint path on the training_params to store model results."""
     input_data_type = training_params.data_source.split(".")[0]
     output_path = current_path / "output" / input_data_type
-    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}-{model_params.attention_type}"
+    model_name = f"h{model_params.hidden_size}-bs{training_params.batch_size}-{model_params.decoder_type}-{model_params.attention_type}-lr-{training_params.learning_rate}"
 
     training_params.checkpoint_dir = f"{str(output_path)}/{model_name}"
