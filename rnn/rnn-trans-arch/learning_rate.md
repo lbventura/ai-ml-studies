@@ -4,3 +4,5 @@ When training the transformer model with the default learning rate of 0.005 (see
 
 | ![Learning Rate of 0.005](output/pig_latin_data/h20-bs64-transformer-additive-lr-0.005/loss_plot.jpg) | ![Learning Rate of 0.001](output/pig_latin_data/h20-bs64-transformer-additive-lr-0.001/loss_plot.jpg) |
 |:---------------------------------------------------------------:|:---------------------------------------------------------------:|
+
+For more details on the influence of the learning rate in gradient descent, see the following [link](https://srdas.github.io/DLBook/GradientDescentTechniques.html), in particular Fig. 7.2.
