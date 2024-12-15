@@ -1,66 +1,71 @@
+from dataclasses import fields
 from pathlib import Path
+from typing import Any
 import torch
+import torch.nn as nn
 import imageio
 import os
 import numpy as np
-from torch.autograd import Variable
+
+from image_generation_gan_arch.data_types import TrainingParams
 
 
-def to_var(tensor, mps=False):
-    """Wraps a Tensor in a Variable, optionally placing it on the GPU.
-
-    Arguments:
-        tensor: A Tensor object.
-        mps: A boolean flag indicating whether to use the GPU.
-
-    Returns:
-        A Variable object, on the GPU if cuda==True.
-    """
-    if mps:
-        return Variable(tensor.to(torch.device("mps")))
-    else:
-        return Variable(tensor)
-
-
-def gan_checkpoint(iteration, G, D, opts):
+def gan_checkpoint(
+    iteration: int, G: nn.Module, D: nn.Module, training_params: TrainingParams
+) -> None:
     """Saves the parameters of the generator G and discriminator D."""
     parent_path = Path(__file__).parent.parent
 
-    G_path = parent_path / opts.checkpoint_dir / "G.pkl"
+    G_path = parent_path / training_params.checkpoint_dir / "G.pkl"
     # G_path = os.path.join(opts.checkpoint_dir, 'G.pkl')
-    D_path = parent_path / opts.checkpoint_dir / "D.pkl"
+    D_path = parent_path / training_params.checkpoint_dir / "D.pkl"
     # D_path = os.path.join(opts.checkpoint_dir, 'D.pkl')
     torch.save(G.state_dict(), G_path)
     torch.save(D.state_dict(), D_path)
 
 
-def cyclegan_checkpoint(iteration, G_XtoY, G_YtoX, D_X, D_Y, opts):
+def cyclegan_checkpoint(
+    iteration: int,
+    G_XtoY: nn.Module,
+    G_YtoX: nn.Module,
+    D_X: nn.Module,
+    D_Y: nn.Module,
+    training_params: TrainingParams,
+) -> None:
     """Saves the parameters of both generators G_YtoX, G_XtoY and discriminators D_X, D_Y."""
-    G_XtoY_path = os.path.join(opts.checkpoint_dir, "G_XtoY.pkl")
-    G_YtoX_path = os.path.join(opts.checkpoint_dir, "G_YtoX.pkl")
-    D_X_path = os.path.join(opts.checkpoint_dir, "D_X.pkl")
-    D_Y_path = os.path.join(opts.checkpoint_dir, "D_Y.pkl")
+    G_XtoY_path = os.path.join(training_params.checkpoint_dir, "G_XtoY.pkl")
+    G_YtoX_path = os.path.join(training_params.checkpoint_dir, "G_YtoX.pkl")
+    D_X_path = os.path.join(training_params.checkpoint_dir, "D_X.pkl")
+    D_Y_path = os.path.join(training_params.checkpoint_dir, "D_Y.pkl")
     torch.save(G_XtoY.state_dict(), G_XtoY_path)
     torch.save(G_YtoX.state_dict(), G_YtoX_path)
     torch.save(D_X.state_dict(), D_X_path)
     torch.save(D_Y.state_dict(), D_Y_path)
 
 
-def load_checkpoint(opts, generator, discriminator):
+def load_checkpoint(
+    training_params: TrainingParams,
+    generator: nn.Module,
+    discriminator: nn.Module,
+    device: torch.device,
+) -> tuple[nn.Module, nn.Module, nn.Module, nn.Module]:
     """Loads the generator and discriminator models from checkpoints."""
-    G_XtoY_path = os.path.join(opts.load, "G_XtoY.pkl")
-    G_YtoX_path = os.path.join(opts.load, "G_YtoX.pkl")
-    D_X_path = os.path.join(opts.load, "D_X.pkl")
-    D_Y_path = os.path.join(opts.load, "D_Y.pkl")
+    assert training_params.load is not None
+    G_XtoY_path = os.path.join(training_params.load, "G_XtoY.pkl")
+    G_YtoX_path = os.path.join(training_params.load, "G_YtoX.pkl")
+    D_X_path = os.path.join(training_params.load, "D_X.pkl")
+    D_Y_path = os.path.join(training_params.load, "D_Y.pkl")
 
     G_XtoY = generator(
-        conv_dim=opts.g_conv_dim, init_zero_weights=opts.init_zero_weights
+        conv_dim=training_params.g_conv_dim,
+        init_zero_weights=training_params.init_zero_weights,
     )  # CycleGenerator
     G_YtoX = generator(
-        conv_dim=opts.g_conv_dim, init_zero_weights=opts.init_zero_weights
+        conv_dim=training_params.g_conv_dim,
+        init_zero_weights=training_params.init_zero_weights,
     )  # CycleGenerator
-    D_X = discriminator(conv_dim=opts.d_conv_dim)  # DCDiscriminator
-    D_Y = discriminator(conv_dim=opts.d_conv_dim)  # DCDiscriminator
+    D_X = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
+    D_Y = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
 
     G_XtoY.load_state_dict(
         torch.load(G_XtoY_path, map_location=lambda storage, loc: storage)
@@ -71,24 +76,26 @@ def load_checkpoint(opts, generator, discriminator):
     D_X.load_state_dict(torch.load(D_X_path, map_location=lambda storage, loc: storage))
     D_Y.load_state_dict(torch.load(D_Y_path, map_location=lambda storage, loc: storage))
 
-    if torch.cuda.is_available():
-        G_XtoY.cuda()
-        G_YtoX.cuda()
-        D_X.cuda()
-        D_Y.cuda()
+    if device.type == "mps" or device.type == "cuda":
+        G_XtoY.to(device)
+        G_YtoX.to(device)
+        D_X.to(device)
+        D_Y.to(device)
         print("Models moved to GPU.")
 
     return G_XtoY, G_YtoX, D_X, D_Y
 
 
-def merge_images(sources, targets, opts):
+def merge_images(
+    sources: torch.Tensor, targets: torch.Tensor, training_params: TrainingParams
+) -> np.ndarray:
     """Creates a grid consisting of pairs of columns, where the first column in
     each pair contains images source images and the second column in each pair
     contains images generated by the CycleGAN from the corresponding images in
     the first column.
     """
     _, _, h, w = sources.shape
-    row = int(np.sqrt(opts.batch_size))
+    row = int(np.sqrt(training_params.batch_size))
     merged = np.zeros([3, row * h, row * w * 2])
     for idx, s, t in zip(
         range(row**2),
@@ -102,7 +109,7 @@ def merge_images(sources, targets, opts):
     return merged.transpose(1, 2, 0)
 
 
-def create_image_grid(array, ncols=None):
+def create_image_grid(array: np.ndarray, ncols: int | None = None) -> np.ndarray:
     """ """
     num_images, channels, cell_h, cell_w = array.shape
     if not ncols:
@@ -120,16 +127,21 @@ def create_image_grid(array, ncols=None):
     return result
 
 
-def gan_save_samples(G, fixed_noise, iteration, opts):
+def gan_save_samples(
+    G: nn.Module,
+    fixed_noise: torch.Tensor,
+    iteration: int,
+    training_params: TrainingParams,
+    device: torch.tensor,
+) -> None:
     generated_images = G(fixed_noise)
-    generated_images = to_data(generated_images)
+    generated_images = to_data(generated_images, device=device)
 
     grid = create_image_grid(generated_images)
 
-    # merged = merge_images(X, fake_Y, opts)
     path = (
         Path(__file__).parent.parent
-        / opts.sample_dir
+        / training_params.sample_dir
         / "sample-{:06d}.png".format(iteration)
     )
     image_array_uint8 = (grid * 255).astype(np.uint8)
@@ -137,35 +149,49 @@ def gan_save_samples(G, fixed_noise, iteration, opts):
     print("Saved {}".format(path))
 
 
-def to_data(x):
+def to_data(x: torch.Tensor, device: torch.device) -> np.ndarray:
     """Converts variable to numpy."""
-    if torch.cuda.is_available():
+    if device.type == "mps" or device.type == "cuda":
         x = x.cpu()
     return x.data.numpy()
 
 
-def cyclegan_save_samples(iteration, fixed_Y, fixed_X, G_YtoX, G_XtoY, opts):
+def cyclegan_save_samples(
+    iteration: int,
+    fixed_Y: torch.Tensor,
+    fixed_X: torch.Tensor,
+    G_YtoX: nn.Module,
+    G_XtoY: nn.Module,
+    training_params: TrainingParams,
+    device: torch.device,
+) -> None:
     """Saves samples from both generators X->Y and Y->X."""
     fake_X = G_YtoX(fixed_Y)
     fake_Y = G_XtoY(fixed_X)
 
-    X, fake_X = to_data(fixed_X), to_data(fake_X)
-    Y, fake_Y = to_data(fixed_Y), to_data(fake_Y)
+    X, fake_X = to_data(fixed_X, device=device), to_data(fake_X, device=device)
+    Y, fake_Y = to_data(fixed_Y, device=device), to_data(fake_Y, device=device)
 
-    merged = merge_images(X, fake_Y, opts)
-    path = os.path.join(opts.sample_dir, "sample-{:06d}-X-Y.png".format(iteration))
+    merged = merge_images(X, fake_Y, training_params)
+    path = os.path.join(
+        training_params.sample_dir, "sample-{:06d}-X-Y.png".format(iteration)
+    )
     image_array_uint8 = (merged * 255).astype(np.uint8)
     imageio.imwrite(path, image_array_uint8)
     print("Saved {}".format(path))
 
-    merged = merge_images(Y, fake_X, opts)
-    path = os.path.join(opts.sample_dir, "sample-{:06d}-Y-X.png".format(iteration))
+    merged = merge_images(Y, fake_X, training_params)
+    path = os.path.join(
+        training_params.sample_dir, "sample-{:06d}-Y-X.png".format(iteration)
+    )
     image_array_uint8 = (merged * 255).astype(np.uint8)
     imageio.imwrite(path, image_array_uint8)
     print("Saved {}".format(path))
 
 
-def print_models(G_XtoY, G_YtoX, D_X, D_Y):
+def print_models(
+    G_XtoY: nn.Module, G_YtoX: nn.Module, D_X: nn.Module, D_Y: nn.Module
+) -> None:
     """Prints model information for the generators and discriminators."""
     if G_YtoX:
         print("                 G_XtoY                ")
@@ -199,51 +225,72 @@ def print_models(G_XtoY, G_YtoX, D_X, D_Y):
         print("---------------------------------------")
 
 
-def create_model(opts, generator, discriminator):
+def create_model(
+    training_params: TrainingParams,
+    generator: nn.Module,
+    discriminator: nn.Module,
+    device: torch.device,
+) -> Any:
     """Builds the generators and discriminators."""
-    if opts.Y is None:
+    if training_params.Y is None:
         ### GAN
         G = generator(
-            noise_size=opts.noise_size, conv_dim=opts.g_conv_dim
+            noise_size=training_params.noise_size, conv_dim=training_params.g_conv_dim
         )  # DCGenerator
-        D = discriminator(conv_dim=opts.d_conv_dim)  # DCDiscriminator
+        D = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
 
         print_models(G, None, D, None)
 
-        if torch.cuda.is_available():
-            G.cuda()
-            D.cuda()
+        if device.type == "mps" or device.type == "cuda":
+            G.to(device)
+            D.to(device)
             print("Models moved to GPU.")
         return G, D
 
     else:
         ### CycleGAN
         G_XtoY = generator(
-            conv_dim=opts.g_conv_dim, init_zero_weights=opts.init_zero_weights
+            conv_dim=training_params.g_conv_dim,
+            init_zero_weights=training_params.init_zero_weights,
         )  # DCGenerator
         G_YtoX = generator(
-            conv_dim=opts.g_conv_dim, init_zero_weights=opts.init_zero_weights
+            conv_dim=training_params.g_conv_dim,
+            init_zero_weights=training_params.init_zero_weights,
         )  # DCGenerator
-        D_X = discriminator(conv_dim=opts.d_conv_dim)  # DCDiscriminator
-        D_Y = discriminator(conv_dim=opts.d_conv_dim)  # DCDiscriminator
+        D_X = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
+        D_Y = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
 
         print_models(G_XtoY, G_YtoX, D_X, D_Y)
 
-        if torch.cuda.is_available():
-            G_XtoY.cuda()
-            G_YtoX.cuda()
-            D_X.cuda()
-            D_Y.cuda()
+        if device.type == "mps" or device.type == "cuda":
+            G_XtoY.to(device)
+            G_YtoX.to(device)
+            D_X.to(device)
+            D_Y.to(device)
             print("Models moved to GPU.")
         return G_XtoY, G_YtoX, D_X, D_Y
 
 
-def print_opts(opts):
+def print_opts(training_params: TrainingParams) -> None:
     """Prints the values of all command-line arguments."""
     print("=" * 80)
-    print("Opts".center(80))
+    print("Training Parameters".center(80))
     print("-" * 80)
-    for key in opts.__dict__:
-        if opts.__dict__[key]:
-            print("{:>30}: {:<30}".format(key, opts.__dict__[key]).center(80))
+    for field in fields(training_params):
+        print(f"{field.name}: {getattr(training_params, field.name)}".center(80))
     print("=" * 80)
+
+
+def sample_noise(batch_size: int, dim: int, device: torch.device) -> torch.Tensor:
+    """
+    Generate a PyTorch Tensor of uniform random noise.
+
+    Input:
+    - batch_size: Integer giving the batch size of noise to generate.
+    - dim: Integer giving the dimension of noise to generate.
+
+    Output:
+    - A PyTorch Tensor of shape (batch_size, dim, 1, 1) containing uniform
+      random noise in the range (-1, 1).
+    """
+    return (torch.rand(batch_size, dim) * 2 - 1).to(device).unsqueeze(2).unsqueeze(3)
