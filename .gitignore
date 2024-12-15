@@ -2,6 +2,10 @@
 cnn-arch/data
 cnn-arch/output
 cnn-arch/cnn/__pycache__/
+gan/image-generation-gan-arch/checkpoints_gan
+gan/image-generation-gan-arch/data
+gan/image-generation-gan-arch/samples_gan
+gan/image-generation-gan-arch/image_generation_gan_arch/__pycache__/
 rnn/rnn-trans-arch/rnn_trans_arch/__pycache__/
 rnn/rnn-trans-arch/data
 rnn/rnn-trans-arch/output
