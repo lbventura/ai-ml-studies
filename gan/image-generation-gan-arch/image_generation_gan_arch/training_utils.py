@@ -7,7 +7,18 @@ import imageio
 import os
 import numpy as np
 
-from image_generation_gan_arch.data_types import TrainingParams
+from image_generation_gan_arch.data_types import TrainingParams, ModelType
+
+
+def create_directories(parent_path: Path, training_params: TrainingParams) -> None:
+    checkpoint_dir_path = parent_path / training_params.checkpoint_dir
+
+    if not os.path.exists(checkpoint_dir_path):
+        os.makedirs(checkpoint_dir_path)
+
+    sample_dir_path = parent_path / training_params.sample_dir
+    if not os.path.exists(sample_dir_path):
+        os.makedirs(sample_dir_path)
 
 
 def gan_checkpoint(
@@ -33,10 +44,11 @@ def cyclegan_checkpoint(
     training_params: TrainingParams,
 ) -> None:
     """Saves the parameters of both generators G_YtoX, G_XtoY and discriminators D_X, D_Y."""
-    G_XtoY_path = os.path.join(training_params.checkpoint_dir, "G_XtoY.pkl")
-    G_YtoX_path = os.path.join(training_params.checkpoint_dir, "G_YtoX.pkl")
-    D_X_path = os.path.join(training_params.checkpoint_dir, "D_X.pkl")
-    D_Y_path = os.path.join(training_params.checkpoint_dir, "D_Y.pkl")
+    parent_path = Path(__file__).parent.parent
+    G_XtoY_path = parent_path / training_params.checkpoint_dir / "G_XtoY.pkl"
+    G_YtoX_path = parent_path / training_params.checkpoint_dir / "G_YtoX.pkl"
+    D_X_path = parent_path / training_params.checkpoint_dir / "D_X.pkl"
+    D_Y_path = parent_path / training_params.checkpoint_dir / "D_Y.pkl"
     torch.save(G_XtoY.state_dict(), G_XtoY_path)
     torch.save(G_YtoX.state_dict(), G_YtoX_path)
     torch.save(D_X.state_dict(), D_X_path)
@@ -173,17 +185,25 @@ def cyclegan_save_samples(
     Y, fake_Y = to_data(fixed_Y, device=device), to_data(fake_Y, device=device)
 
     merged = merge_images(X, fake_Y, training_params)
-    path = os.path.join(
-        training_params.sample_dir, "sample-{:06d}-X-Y.png".format(iteration)
+
+    path = (
+        Path(__file__).parent.parent
+        / training_params.sample_dir
+        / "sample-{:06d}-X-Y.png".format(iteration)
     )
+
     image_array_uint8 = (merged * 255).astype(np.uint8)
     imageio.imwrite(path, image_array_uint8)
     print("Saved {}".format(path))
 
     merged = merge_images(Y, fake_X, training_params)
-    path = os.path.join(
-        training_params.sample_dir, "sample-{:06d}-Y-X.png".format(iteration)
+
+    path = (
+        Path(__file__).parent.parent
+        / training_params.sample_dir
+        / "sample-{:06d}-Y-X.png".format(iteration)
     )
+
     image_array_uint8 = (merged * 255).astype(np.uint8)
     imageio.imwrite(path, image_array_uint8)
     print("Saved {}".format(path))
@@ -232,7 +252,7 @@ def create_model(
     device: torch.device,
 ) -> Any:
     """Builds the generators and discriminators."""
-    if training_params.Y is None:
+    if training_params.model_type == ModelType.dcgan:
         ### GAN
         G = generator(
             noise_size=training_params.noise_size, conv_dim=training_params.g_conv_dim

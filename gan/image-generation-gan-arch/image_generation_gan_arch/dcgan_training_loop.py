@@ -1,5 +1,6 @@
 import torch
 import torch.optim as optim
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from image_generation_gan_arch.training_utils import (
@@ -17,7 +18,7 @@ def dcgan_training_loop(
     test_dataloader: DataLoader,
     training_params: TrainingParams,
     device: torch.device,
-) -> tuple[DCGenerator, DCDiscriminator]:
+) -> dict[str, nn.Module]:
     """Runs the training loop.
     * Saves checkpoint every training_params.checkpoint_every iterations
     * Saves generated samples every training_params.sample_every iterations
@@ -64,7 +65,6 @@ def dcgan_training_loop(
 
             d_optimizer.zero_grad()
 
-            # FILL THIS IN
             # 1. Compute the discriminator loss on real images
             D_real_loss = 0.5 * torch.mean((D(real_images) - 1) ** 2)
 
@@ -91,7 +91,6 @@ def dcgan_training_loop(
 
             g_optimizer.zero_grad()
 
-            # FILL THIS IN
             # 1. Sample noise
             noise = sample_noise(
                 100, training_params.noise_size, device=device
@@ -130,6 +129,6 @@ def dcgan_training_loop(
 
     except KeyboardInterrupt:
         print("Exiting early from training.")
-        return G, D
+        return {"generator": G, "discriminator": D}
 
-    return G, D
+    return {"generator": G, "discriminator": D}
