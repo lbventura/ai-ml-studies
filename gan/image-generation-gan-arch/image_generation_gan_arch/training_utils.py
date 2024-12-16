@@ -1,13 +1,12 @@
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
 import torch
 import torch.nn as nn
 import imageio
 import os
 import numpy as np
 
-from image_generation_gan_arch.data_types import TrainingParams, ModelType
+from image_generation_gan_arch.data_types import TrainingParams
 
 
 def create_directories(parent_path: Path, training_params: TrainingParams) -> None:
@@ -21,81 +20,18 @@ def create_directories(parent_path: Path, training_params: TrainingParams) -> No
         os.makedirs(sample_dir_path)
 
 
-def gan_checkpoint(
-    iteration: int, G: nn.Module, D: nn.Module, training_params: TrainingParams
+def model_checkpoint(
+    iteration: int, training_params: TrainingParams, models: dict[str, nn.Module]
 ) -> None:
-    """Saves the parameters of the generator G and discriminator D."""
     parent_path = Path(__file__).parent.parent
 
-    G_path = parent_path / training_params.checkpoint_dir / "G.pkl"
-    # G_path = os.path.join(opts.checkpoint_dir, 'G.pkl')
-    D_path = parent_path / training_params.checkpoint_dir / "D.pkl"
-    # D_path = os.path.join(opts.checkpoint_dir, 'D.pkl')
-    torch.save(G.state_dict(), G_path)
-    torch.save(D.state_dict(), D_path)
-
-
-def cyclegan_checkpoint(
-    iteration: int,
-    G_XtoY: nn.Module,
-    G_YtoX: nn.Module,
-    D_X: nn.Module,
-    D_Y: nn.Module,
-    training_params: TrainingParams,
-) -> None:
-    """Saves the parameters of both generators G_YtoX, G_XtoY and discriminators D_X, D_Y."""
-    parent_path = Path(__file__).parent.parent
-    G_XtoY_path = parent_path / training_params.checkpoint_dir / "G_XtoY.pkl"
-    G_YtoX_path = parent_path / training_params.checkpoint_dir / "G_YtoX.pkl"
-    D_X_path = parent_path / training_params.checkpoint_dir / "D_X.pkl"
-    D_Y_path = parent_path / training_params.checkpoint_dir / "D_Y.pkl"
-    torch.save(G_XtoY.state_dict(), G_XtoY_path)
-    torch.save(G_YtoX.state_dict(), G_YtoX_path)
-    torch.save(D_X.state_dict(), D_X_path)
-    torch.save(D_Y.state_dict(), D_Y_path)
-
-
-def load_checkpoint(
-    training_params: TrainingParams,
-    generator: nn.Module,
-    discriminator: nn.Module,
-    device: torch.device,
-) -> tuple[nn.Module, nn.Module, nn.Module, nn.Module]:
-    """Loads the generator and discriminator models from checkpoints."""
-    assert training_params.load is not None
-    G_XtoY_path = os.path.join(training_params.load, "G_XtoY.pkl")
-    G_YtoX_path = os.path.join(training_params.load, "G_YtoX.pkl")
-    D_X_path = os.path.join(training_params.load, "D_X.pkl")
-    D_Y_path = os.path.join(training_params.load, "D_Y.pkl")
-
-    G_XtoY = generator(
-        conv_dim=training_params.g_conv_dim,
-        init_zero_weights=training_params.init_zero_weights,
-    )  # CycleGenerator
-    G_YtoX = generator(
-        conv_dim=training_params.g_conv_dim,
-        init_zero_weights=training_params.init_zero_weights,
-    )  # CycleGenerator
-    D_X = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
-    D_Y = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
-
-    G_XtoY.load_state_dict(
-        torch.load(G_XtoY_path, map_location=lambda storage, loc: storage)
-    )
-    G_YtoX.load_state_dict(
-        torch.load(G_YtoX_path, map_location=lambda storage, loc: storage)
-    )
-    D_X.load_state_dict(torch.load(D_X_path, map_location=lambda storage, loc: storage))
-    D_Y.load_state_dict(torch.load(D_Y_path, map_location=lambda storage, loc: storage))
-
-    if device.type == "mps" or device.type == "cuda":
-        G_XtoY.to(device)
-        G_YtoX.to(device)
-        D_X.to(device)
-        D_Y.to(device)
-        print("Models moved to GPU.")
-
-    return G_XtoY, G_YtoX, D_X, D_Y
+    for model_name, model in models.items():
+        model_path = (
+            parent_path
+            / training_params.checkpoint_dir
+            / f"{model_name}_{iteration}.pkl"
+        )
+        torch.save(model.state_dict(), model_path)
 
 
 def merge_images(
@@ -243,52 +179,6 @@ def print_models(
         print("---------------------------------------")
         print(D_X)
         print("---------------------------------------")
-
-
-def create_model(
-    training_params: TrainingParams,
-    generator: nn.Module,
-    discriminator: nn.Module,
-    device: torch.device,
-) -> Any:
-    """Builds the generators and discriminators."""
-    if training_params.model_type == ModelType.dcgan:
-        ### GAN
-        G = generator(
-            noise_size=training_params.noise_size, conv_dim=training_params.g_conv_dim
-        )  # DCGenerator
-        D = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
-
-        print_models(G, None, D, None)
-
-        if device.type == "mps" or device.type == "cuda":
-            G.to(device)
-            D.to(device)
-            print("Models moved to GPU.")
-        return G, D
-
-    else:
-        ### CycleGAN
-        G_XtoY = generator(
-            conv_dim=training_params.g_conv_dim,
-            init_zero_weights=training_params.init_zero_weights,
-        )  # DCGenerator
-        G_YtoX = generator(
-            conv_dim=training_params.g_conv_dim,
-            init_zero_weights=training_params.init_zero_weights,
-        )  # DCGenerator
-        D_X = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
-        D_Y = discriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
-
-        print_models(G_XtoY, G_YtoX, D_X, D_Y)
-
-        if device.type == "mps" or device.type == "cuda":
-            G_XtoY.to(device)
-            G_YtoX.to(device)
-            D_X.to(device)
-            D_Y.to(device)
-            print("Models moved to GPU.")
-        return G_XtoY, G_YtoX, D_X, D_Y
 
 
 def print_opts(training_params: TrainingParams) -> None:

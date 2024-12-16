@@ -4,13 +4,31 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from image_generation_gan_arch.training_utils import (
-    create_model,
-    gan_checkpoint,
     gan_save_samples,
+    model_checkpoint,
+    print_models,
     sample_noise,
 )
 from image_generation_gan_arch.dcgan import DCGenerator, DCDiscriminator
 from image_generation_gan_arch.data_types import TrainingParams
+
+
+def create_model(
+    training_params: TrainingParams, device: torch.device
+) -> tuple[DCGenerator, DCDiscriminator]:
+    """Builds the generators and discriminators for dcgan"""
+    G = DCGenerator(
+        noise_size=training_params.noise_size, conv_dim=training_params.g_conv_dim
+    )  # DCGenerator
+    D = DCDiscriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
+
+    print_models(G, None, D, None)
+
+    if device.type == "mps" or device.type == "cuda":
+        G.to(device)
+        D.to(device)
+        print("Models moved to GPU.")
+    return G, D
 
 
 def dcgan_training_loop(
@@ -25,7 +43,7 @@ def dcgan_training_loop(
     """
 
     # Create generators and discriminators
-    G, D = create_model(training_params, DCGenerator, DCDiscriminator, device)
+    G, D = create_model(training_params=training_params, device=device)
 
     g_params = G.parameters()  # Get generator parameters
     d_params = D.parameters()  # Get discriminator parameters
@@ -125,7 +143,10 @@ def dcgan_training_loop(
 
             # Save the model parameters
             if iteration % training_params.checkpoint_every == 0:
-                gan_checkpoint(iteration, G, D, training_params)
+                models = {"G": G, "D": D}
+                model_checkpoint(
+                    iteration=iteration, models=models, training_params=training_params
+                )
 
     except KeyboardInterrupt:
         print("Exiting early from training.")

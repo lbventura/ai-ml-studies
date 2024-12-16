@@ -20,35 +20,37 @@ class CycleGenerator(nn.Module):  # type: ignore
 
         self.conv1 = conv(
             in_channels=self.input_channels,
-            out_channels=32,  # as given in the diagram
+            out_channels=conv_dim,  # 32, as given in the diagram
             kernel_size=self.kernel_size,
-            stride=self.stride,
+            stride=self.stride,  # 2, as given in the diagram
             padding=2,  # see formula
             batch_norm=True,
+            init_zero_weights=init_zero_weights,
         )
         self.conv2 = conv(
-            in_channels=32,
-            out_channels=64,  # as given in the diagram
+            in_channels=conv_dim,
+            out_channels=conv_dim * 2,  # as given in the diagram
             kernel_size=self.kernel_size,
-            stride=self.stride,
+            stride=self.stride,  # 2, as given in the diagram
             padding=2,  # see formula
             batch_norm=True,
+            init_zero_weights=init_zero_weights,
         )
 
         # 2. Define the transformation part of the generator
         self.resnet_block = ResnetBlock(
-            conv_dim=64
+            conv_dim=conv_dim * 2,
         )  # the in_channels = conv_dim, and we know that the number of in_channels is equal to 64
 
         # 3. Define the decoder part of the generator (that builds up the output image from features)
         self.upconv1 = upconv(
-            in_channels=64,
-            out_channels=32,  # as given in the diagram
+            in_channels=conv_dim * 2,
+            out_channels=conv_dim,  # as given in the diagram
             kernel_size=5,
             batch_norm=True,
         )  # this guarantees an output of 32 x 16 x 16
         self.upconv2 = upconv(
-            in_channels=32,
+            in_channels=conv_dim,
             out_channels=3,  # as given in the diagram
             kernel_size=5,
             batch_norm=False,

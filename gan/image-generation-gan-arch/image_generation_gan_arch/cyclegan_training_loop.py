@@ -3,14 +3,39 @@ import torch.optim as optim
 import torch.nn as nn
 
 from image_generation_gan_arch.training_utils import (
-    create_model,
-    cyclegan_checkpoint,
     cyclegan_save_samples,
+    model_checkpoint,
+    print_models,
 )
 from torch.utils.data import DataLoader
 from image_generation_gan_arch.dcgan import DCDiscriminator
 from image_generation_gan_arch.cyclegan import CycleGenerator
 from image_generation_gan_arch.data_types import TrainingParams
+
+
+def create_model(
+    training_params: TrainingParams, device: torch.device
+) -> tuple[CycleGenerator, CycleGenerator, DCDiscriminator, DCDiscriminator]:
+    G_XtoY = CycleGenerator(
+        conv_dim=training_params.g_conv_dim,
+        init_zero_weights=training_params.init_zero_weights,
+    )
+    G_YtoX = CycleGenerator(
+        conv_dim=training_params.g_conv_dim,
+        init_zero_weights=training_params.init_zero_weights,
+    )
+    D_X = DCDiscriminator(conv_dim=training_params.d_conv_dim)
+    D_Y = DCDiscriminator(conv_dim=training_params.d_conv_dim)
+
+    print_models(G_XtoY, G_YtoX, D_X, D_Y)
+
+    if device.type == "mps" or device.type == "cuda":
+        G_XtoY.to(device)
+        G_YtoX.to(device)
+        D_X.to(device)
+        D_Y.to(device)
+        print("Models moved to GPU.")
+    return G_XtoY, G_YtoX, D_X, D_Y
 
 
 def cyclegan_training_loop(
@@ -28,7 +53,7 @@ def cyclegan_training_loop(
 
     # Create generators and discriminators
     G_XtoY, G_YtoX, D_X, D_Y = create_model(
-        training_params, CycleGenerator, DCDiscriminator, device
+        training_params=training_params, device=device
     )
 
     g_params = list(G_XtoY.parameters()) + list(
@@ -135,7 +160,7 @@ def cyclegan_training_loop(
             g_optimizer.step()
 
             #########################################
-            ##    FILL THIS IN: X--Y-->X CYCLE     ##
+            ##           X--Y-->X CYCLE     ##
             #########################################
 
             g_optimizer.zero_grad()
@@ -186,8 +211,9 @@ def cyclegan_training_loop(
 
             # Save the model parameters
             if iteration % training_params.checkpoint_every == 0:
-                cyclegan_checkpoint(
-                    iteration, G_XtoY, G_YtoX, D_X, D_Y, training_params
+                models = {"G_XtoY": G_XtoY, "G_YtoX": G_YtoX, "D_X": D_X, "D_Y": D_Y}
+                model_checkpoint(
+                    iteration=iteration, models=models, training_params=training_params
                 )
 
     except KeyboardInterrupt:

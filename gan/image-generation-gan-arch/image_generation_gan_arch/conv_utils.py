@@ -8,7 +8,7 @@ def upconv(
     kernel_size: int,
     stride: int = 2,
     padding: int = 2,
-    batch_norm: int = True,
+    batch_norm: bool = True,
 ) -> nn.Module:
     """Creates a upsample-and-convolution layer, with optional batch normalization."""
     layers = []
@@ -34,8 +34,8 @@ def conv(
     kernel_size: int,
     stride: int = 2,
     padding: int = 2,
-    batch_norm: int = True,
-    init_zero_weights: int = False,
+    batch_norm: bool = True,
+    init_zero_weights: bool = False,
 ) -> nn.Module:
     """Creates a convolutional layer, with optional batch normalization."""
     layers = []

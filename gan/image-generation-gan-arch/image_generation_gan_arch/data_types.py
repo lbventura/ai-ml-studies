@@ -29,8 +29,8 @@ class TrainingParams:
     lambda_cycle: float | None = None
 
     def __post_init__(self) -> None:
-        self.checkpoint_dir = f"checkpoints/{self.model_type}"
-        self.sample_dir = f"samples/{self.model_type}"
+        self.checkpoint_dir = f"checkpoints/{self.model_type}-{self.X}-lr-{self.lr}-train-iter-{self.train_iters}"
+        self.sample_dir = f"samples/{self.model_type}-{self.X}-lr-{self.lr}-train-iter-{self.train_iters}"
 
         if self.model_type == ModelType.cyclegan and self.X == "Windows":
             self.Y = "Apple"
