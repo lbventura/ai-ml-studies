@@ -8,6 +8,7 @@ from image_generation_gan_arch.dcgan_training_loop import dcgan_training_loop
 from image_generation_gan_arch.data_types import ModelType, TrainingParams
 from image_generation_gan_arch.training_utils import create_directories, print_opts
 from pathlib import Path
+import time
 
 SEED = 11
 
@@ -69,6 +70,9 @@ def train(
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     training_params = TrainingParams(model_type=ModelType.cyclegan, lambda_cycle=0.03)
     print_opts(training_params=training_params)
     train(training_params=training_params)
+    end_time = time.time()
+    print(f"Total runtime: {(end_time - start_time):.2f} seconds")
