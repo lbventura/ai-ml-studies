@@ -100,6 +100,7 @@ def dcgan_training_loop(
             # 5. Compute the total discriminator loss
             D_total_loss = D_real_loss + D_fake_loss
 
+            # 6. Update discriminator parameters
             D_total_loss.backward()
             d_optimizer.step()
 
@@ -120,6 +121,7 @@ def dcgan_training_loop(
             # 3. Compute the generator loss
             G_loss = torch.mean((D(fake_images) - 1) ** 2)
 
+            # 4. Update generator parameters
             G_loss.backward()
             g_optimizer.step()
 
