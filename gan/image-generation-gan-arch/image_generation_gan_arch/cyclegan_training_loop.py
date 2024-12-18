@@ -140,6 +140,11 @@ def cyclegan_training_loop(
             # =========================================
             #            TRAIN THE GENERATORS
             # =========================================
+
+            #########################################
+            ##           Y--X-->Y CYCLE     ##
+            #########################################
+
             g_optimizer.zero_grad()
 
             # 1. Generate fake images that look like domain X based on real images in domain Y
