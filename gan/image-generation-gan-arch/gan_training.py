@@ -37,11 +37,15 @@ def train(
 
     # Create train and test dataloaders for images from the two domains X and Y
     dataloader_X, test_dataloader_X = get_emoji_loader(
-        emoji_type=training_params.X, training_params=training_params
+        emoji_type=training_params.X,
+        image_size=training_params.image_size,
+        batch_size=training_params.batch_size,
     )
     if training_params.model_type == ModelType.cyclegan:
         dataloader_Y, test_dataloader_Y = get_emoji_loader(
-            emoji_type=training_params.Y, training_params=training_params
+            emoji_type=training_params.Y,
+            image_size=training_params.image_size,
+            batch_size=training_params.batch_size,
         )
 
     # Create checkpoint and sample directories
@@ -71,7 +75,9 @@ def train(
 
 if __name__ == "__main__":
     start_time = time.time()
-    training_params = TrainingParams(model_type=ModelType.dcgan)
+    training_params = TrainingParams(
+        model_type=ModelType.dcgan,
+    )
     print_opts(training_params=training_params)
     train(training_params=training_params)
     end_time = time.time()

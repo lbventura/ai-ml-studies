@@ -7,7 +7,6 @@ import tarfile
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from image_generation_gan_arch.data_types import TrainingParams
 
 
 def get_file(
@@ -47,12 +46,14 @@ def get_file(
 
 
 def get_emoji_loader(
-    emoji_type: str, training_params: TrainingParams
+    emoji_type: str,
+    image_size: int,
+    batch_size: int,
 ) -> tuple[DataLoader, DataLoader]:
     """Creates training and test data loaders."""
     transform = transforms.Compose(
         [
-            transforms.Resize(training_params.image_size),  # Scale
+            transforms.Resize(image_size),  # Scale
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -68,15 +69,15 @@ def get_emoji_loader(
 
     train_dloader = DataLoader(
         dataset=train_dataset,
-        batch_size=training_params.batch_size,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=training_params.num_workers,
+        num_workers=0,
     )
     test_dloader = DataLoader(
         dataset=test_dataset,
-        batch_size=training_params.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=training_params.num_workers,
+        num_workers=0,
     )
 
     return train_dloader, test_dloader
