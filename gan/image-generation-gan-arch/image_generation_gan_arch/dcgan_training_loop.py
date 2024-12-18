@@ -8,6 +8,7 @@ from image_generation_gan_arch.training_utils import (
     model_checkpoint,
     print_models,
     sample_noise,
+    save_loss_plot,
 )
 from image_generation_gan_arch.dcgan import DCGenerator, DCDiscriminator
 from image_generation_gan_arch.data_types import TrainingParams
@@ -19,8 +20,8 @@ def create_model(
     """Builds the generators and discriminators for dcgan"""
     G = DCGenerator(
         noise_size=training_params.noise_size, conv_dim=training_params.g_conv_dim
-    )  # DCGenerator
-    D = DCDiscriminator(conv_dim=training_params.d_conv_dim)  # DCDiscriminator
+    )
+    D = DCDiscriminator(conv_dim=training_params.d_conv_dim)
 
     print_models(G, None, D, None)
 
@@ -68,6 +69,9 @@ def dcgan_training_loop(
 
     iter_per_epoch = len(train_iter)
     total_train_iters = training_params.train_iters
+
+    train_disc_loss: list[float] = []
+    train_gen_loss: list[float] = []
 
     try:
         for iteration in range(1, training_params.train_iters + 1):
@@ -125,6 +129,9 @@ def dcgan_training_loop(
             G_loss.backward()
             g_optimizer.step()
 
+            train_gen_loss.append(G_loss.item())
+            train_disc_loss.append(D_total_loss.item())
+
             # Print the log info
             if iteration % training_params.log_step == 0:
                 print(
@@ -153,5 +160,11 @@ def dcgan_training_loop(
     except KeyboardInterrupt:
         print("Exiting early from training.")
         return {"generator": G, "discriminator": D}
+
+    save_loss_plot(
+        gen_losses=train_gen_loss,
+        disc_losses=train_disc_loss,
+        training_params=training_params,
+    )
 
     return {"generator": G, "discriminator": D}

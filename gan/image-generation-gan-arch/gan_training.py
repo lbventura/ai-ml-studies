@@ -71,7 +71,7 @@ def train(
 
 if __name__ == "__main__":
     start_time = time.time()
-    training_params = TrainingParams(model_type=ModelType.cyclegan, lambda_cycle=0.03)
+    training_params = TrainingParams(model_type=ModelType.dcgan)
     print_opts(training_params=training_params)
     train(training_params=training_params)
     end_time = time.time()

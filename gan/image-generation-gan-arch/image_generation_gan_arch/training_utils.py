@@ -5,6 +5,7 @@ import torch.nn as nn
 import imageio
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 from image_generation_gan_arch.data_types import TrainingParams
 
@@ -204,3 +205,40 @@ def sample_noise(batch_size: int, dim: int, device: torch.device) -> torch.Tenso
       random noise in the range (-1, 1).
     """
     return (torch.rand(batch_size, dim) * 2 - 1).to(device).unsqueeze(2).unsqueeze(3)
+
+
+def save_loss_plot(
+    gen_losses: list[float],
+    disc_losses: list[float],
+    training_params: TrainingParams,
+    train: bool = True,
+) -> None:
+    """Saves a plot of the training and validation loss curves."""
+    parent_path = Path(__file__).parent.parent
+
+    plt.figure()
+    plt.plot(
+        range(len(gen_losses)),
+        gen_losses,
+        label="Generator Loss",
+        color="blue",
+        linewidth=2,
+    )
+    plt.plot(
+        range(len(disc_losses)),
+        disc_losses,
+        label="Discriminator Loss",
+        color="red",
+        linewidth=2,
+    )
+    plt.xlabel("Epochs", fontsize=16)
+    plt.ylabel("Loss", fontsize=16)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.legend()
+    plt.tight_layout()
+    fig_path = parent_path / training_params.checkpoint_dir
+    prefix = "train" if train else "val"
+    plt.title(f"{prefix.capitalize()}ing Losses", fontsize=18)
+    plt.savefig(os.path.join(fig_path, f"{prefix}_loss_plot.pdf"))
+    plt.close()

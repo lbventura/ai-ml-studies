@@ -21,7 +21,6 @@ class TrainingParams:
     beta1: float = 0.5
     beta2: float = 0.999
     batch_size: int = 5
-    load: str | None = None
     log_step: int = 100
     sample_every: int = 100
     checkpoint_every: int = 100
