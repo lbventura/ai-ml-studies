@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from image_generation_gan_arch.dcgan import DCGenerator, DCDiscriminator
 from image_generation_gan_arch.training_utils import sample_noise
 from image_generation_gan_arch.data_extraction import get_emoji_loader
+from image_generation_gan_arch.data_types import InputType
 
 SEED = 11
 
@@ -62,6 +63,7 @@ def load_models(
 
 
 def test_discriminator(
+    input_type: InputType,
     batch_size: int,
     device: torch.device,
     generator: DCGenerator,
@@ -76,7 +78,7 @@ def test_discriminator(
     fake_outputs = torch.cat((fake_disc_outputs.unsqueeze(1), zeros_tensor), dim=1)
 
     _, test_dataloader_X = get_emoji_loader(
-        emoji_type="Windows", image_size=32, batch_size=batch_size
+        emoji_type=input_type, image_size=32, batch_size=batch_size
     )
 
     test_iter = iter(test_dataloader_X)
@@ -142,9 +144,9 @@ if __name__ == "__main__":
     parent_file = Path(__file__).parent
 
     MODEL_TYPE = "dcgan"
-    EMOJI_TYPE = "Apple"
+    EMOJI_TYPE = InputType.Windows
     LEARNING_RATE = 0.0003
-    NUMBER_ITERATIONS = 10000
+    NUMBER_ITERATIONS = 5000
     BATCH_SIZE = 100
 
     saved_folder_path = str(
@@ -157,6 +159,7 @@ if __name__ == "__main__":
     )
 
     results = test_discriminator(
+        input_type=EMOJI_TYPE,
         batch_size=BATCH_SIZE,
         device=DEVICE,
         generator=generator,

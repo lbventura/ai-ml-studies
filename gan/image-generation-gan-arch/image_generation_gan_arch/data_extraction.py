@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import cast
 
 from six.moves.urllib.request import urlretrieve  # type: ignore
 import tarfile
@@ -7,6 +8,7 @@ import tarfile
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data import DataLoader
+from image_generation_gan_arch.data_types import InputType
 
 
 def get_file(
@@ -46,7 +48,7 @@ def get_file(
 
 
 def get_emoji_loader(
-    emoji_type: str,
+    emoji_type: InputType,
     image_size: int,
     batch_size: int,
 ) -> tuple[DataLoader, DataLoader]:
@@ -61,8 +63,9 @@ def get_emoji_loader(
 
     data_path = Path(__file__).parent.parent / "data/emojis"
 
-    train_path = os.path.join(data_path, emoji_type)
-    test_path = os.path.join(data_path, "Test_{}".format(emoji_type))
+    data_type = cast(str, emoji_type.value)
+    train_path = os.path.join(data_path, data_type)
+    test_path = os.path.join(data_path, "Test_{}".format(data_type))
 
     train_dataset = datasets.ImageFolder(train_path, transform)
     test_dataset = datasets.ImageFolder(test_path, transform)
