@@ -60,6 +60,7 @@ def dcgan_training_loop(
     )
 
     train_iter = iter(dataloader)
+    test_iter = iter(test_dataloader)
 
     # Get some fixed data from domains X and Y for sampling. These are images that are held
     # constant throughout training, that allow us to inspect the model's performance.
@@ -68,9 +69,11 @@ def dcgan_training_loop(
     )  # # 100 x noise_size x 1 x 1
 
     iter_per_epoch = len(train_iter)
+    test_iter_per_epoch = len(test_iter)
     total_train_iters = training_params.train_iters
 
     train_disc_loss: list[float] = []
+    test_disc_loss: list[float] = []
     train_gen_loss: list[float] = []
 
     try:
@@ -78,6 +81,8 @@ def dcgan_training_loop(
             # Reset data_iter for each epoch
             if iteration % iter_per_epoch == 0:
                 train_iter = iter(dataloader)
+            if iteration % test_iter_per_epoch == 0:
+                test_iter = iter(test_dataloader)
 
             real_images, real_labels = next(train_iter)
             real_images, real_labels = (
@@ -108,6 +113,30 @@ def dcgan_training_loop(
             D_total_loss.backward()
             d_optimizer.step()
 
+            test_real_images, test_real_labels = next(test_iter)
+            test_real_images, test_real_labels = (
+                test_real_images.to(device),
+                test_real_labels.long().squeeze().to(device),
+            )
+
+            ### Compute test discriminator loss
+            # 1. Compute the discriminator loss on real images
+            test_D_real_loss = 0.5 * torch.mean((D(test_real_images) - 1) ** 2)
+
+            # 2. Sample noise
+            noise = sample_noise(
+                100, training_params.noise_size, device=device
+            )  # # 100 x noise_size x 1 x 1
+
+            # 3. Generate fake images from the noise
+            test_fake_images = G(noise)
+
+            # 4. Compute the discriminator loss on the fake images
+            test_D_fake_loss = 0.5 * torch.mean((D(test_fake_images)) ** 2)
+
+            # 5. Compute the total discriminator loss
+            test_D_total_loss = test_D_real_loss + test_D_fake_loss
+
             ###########################################
             ###          TRAIN THE GENERATOR        ###
             ###########################################
@@ -131,6 +160,8 @@ def dcgan_training_loop(
 
             train_gen_loss.append(G_loss.item())
             train_disc_loss.append(D_total_loss.item())
+
+            test_disc_loss.append(test_D_total_loss.item())
 
             # Print the log info
             if iteration % training_params.log_step == 0:
@@ -165,6 +196,12 @@ def dcgan_training_loop(
         gen_losses=train_gen_loss,
         disc_losses=train_disc_loss,
         training_params=training_params,
+    )
+    save_loss_plot(
+        gen_losses=train_gen_loss,
+        disc_losses=test_disc_loss,
+        training_params=training_params,
+        train=False,
     )
 
     return {"generator": G, "discriminator": D}
