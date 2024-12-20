@@ -6,10 +6,10 @@ import numpy as np
 import numpy.random as npr
 import torch
 import torch.nn as nn
-from cnn.cnnet import CNN
-from cnn.data_extraction import load_cifar10, load_colors
-from cnn.data_preprocessing import get_rgb_cat, process
-from cnn.training_utils import (
+from cnn_arch.cnnet import CNN
+from cnn_arch.data_extraction import load_cifar10, load_colors
+from cnn_arch.data_preprocessing import get_rgb_cat, process
+from cnn_arch.training_utils import (
     get_batch,
     compute_loss,
     get_torch_vars,
@@ -17,10 +17,10 @@ from cnn.training_utils import (
     run_validation_step,
 )
 
-from cnn.unet import UNet
+from cnn_arch.unet import UNet
 
 from pathlib import Path
-from cnn.data_types import ModelParams, TrainingParams, ModelData
+from cnn_arch.data_types import ModelParams, TrainingParams, ModelData
 
 
 def _prepare_data(training_args: TrainingParams) -> tuple[np.array, ModelData]:

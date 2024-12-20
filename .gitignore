@@ -1,7 +1,7 @@
 # Ignore __pycache__ directories
 cnn-arch/data
-cnn-arch/output
-cnn-arch/cnn/__pycache__/
+cnn-arch/outputs
+cnn-arch/cnn_arch/__pycache__/
 gan/image-generation-gan-arch/checkpoints
 gan/image-generation-gan-arch/data
 gan/image-generation-gan-arch/samples

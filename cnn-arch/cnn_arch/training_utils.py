@@ -8,8 +8,8 @@ from torch.autograd import Variable
 from torch.nn.modules.loss import _Loss
 
 
-from cnn.data_preprocessing import get_cat_rgb
-from cnn.data_extraction import IMAGE_SIZE
+from cnn_arch.data_preprocessing import get_cat_rgb
+from cnn_arch.data_extraction import IMAGE_SIZE
 
 
 def get_batch(

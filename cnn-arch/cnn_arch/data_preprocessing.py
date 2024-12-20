@@ -6,7 +6,7 @@ import numpy.random as npr
 import torch
 import torch.nn as nn
 
-from cnn.data_types import Categories
+from cnn_arch.data_types import Categories
 
 
 def get_rgb_cat(xs: np.array, colours: np.array) -> np.array:
