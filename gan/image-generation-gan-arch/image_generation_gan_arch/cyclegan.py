@@ -11,7 +11,9 @@ class CycleGenerator(nn.Module):  # type: ignore
     Note: Both generators G_XtoY and G_YtoX have the same architecture in this assignment.
     """
 
-    def __init__(self, conv_dim: int = 64, init_zero_weights: bool = False) -> None:
+    def __init__(
+        self, conv_dim: int = 64, init_zero_weights: bool = False, noise_size: int = 100
+    ) -> None:
         super(CycleGenerator, self).__init__()
 
         self.kernel_size = 5
