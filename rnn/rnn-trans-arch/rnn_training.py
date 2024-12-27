@@ -1,4 +1,5 @@
 import os
+import time
 from typing import cast
 import torch
 from rnn_trans_arch.data_types import (
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         origin="http://www.cs.toronto.edu/~jba/pig_latin_data.txt",
         untar=False,
     )
-
+    start_time = time.time()
     (
         rnn_attn_encoder_scaled_dot,
         rnn_attn_decoder_scaled_dot,
@@ -148,6 +149,8 @@ if __name__ == "__main__":
         test_dict,
         idx_dict,
     ) = train(training_params=training_params, model_params=model_params)
+    end_time = time.time()
+    print(f"Total runtime: {(end_time - start_time):.2f} seconds")
 
     translated = translate_sentence(
         TEST_SENTENCE,
