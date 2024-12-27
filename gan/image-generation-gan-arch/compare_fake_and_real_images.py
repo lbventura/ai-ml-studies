@@ -1,13 +1,15 @@
 import os
 from pathlib import Path
+from typing import cast
 from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+from image_generation_gan_arch.cyclegan import CycleGenerator
 from image_generation_gan_arch.dcgan import DCGenerator, DCDiscriminator
 from image_generation_gan_arch.training_utils import sample_noise
 from image_generation_gan_arch.data_extraction import get_emoji_loader
-from image_generation_gan_arch.data_types import InputType
+from image_generation_gan_arch.data_types import InputType, ModelType
 
 SEED = 11
 
@@ -28,17 +30,45 @@ else:
     DEVICE = torch.device("cpu")
     print("Using CPU device.")
 
+GeneratorType = DCGenerator | CycleGenerator
+
 
 def load_models(
-    saved_folder_path: str, device: torch.device
-) -> tuple[DCGenerator, DCDiscriminator]:
-    generator = DCGenerator(noise_size=100, conv_dim=32)
-    generator.to(DEVICE)
+    input_type: InputType,
+    model_type: ModelType,
+    saved_folder_path: str,
+    device: torch.device,
+) -> tuple[GeneratorType, DCDiscriminator]:
+    if model_type == ModelType.dcgan:
+        discriminator = DCDiscriminator
+        generator = cast(GeneratorType, DCGenerator)
+        discriminator_suffix = ""
+        generator_suffix = ""
+    elif model_type == ModelType.cyclegan and input_type == InputType.Windows:
+        discriminator = DCDiscriminator
+        generator = cast(GeneratorType, CycleGenerator)
+        discriminator_suffix = "_X"
+        generator_suffix = "_YtoX"
+    elif model_type == ModelType.cyclegan and input_type == InputType.Apple:
+        discriminator = DCDiscriminator
+        generator = cast(GeneratorType, CycleGenerator)
+        discriminator_suffix = "_Y"
+        generator_suffix = "_XtoY"
+    else:
+        raise ValueError("Invalid model type. Must be either 'dcgan' or 'cyclegan'.")
+
+    discriminator = discriminator(conv_dim=64)
+    discriminator.to(device)
+
+    generator = generator(noise_size=100, conv_dim=32)
+    generator.to(device)
 
     generator.load_state_dict(
         torch.load(
-            os.path.join(saved_folder_path, f"G_{NUMBER_ITERATIONS}.pkl"),
-            map_location=DEVICE,
+            os.path.join(
+                saved_folder_path, f"G{generator_suffix}_{NUMBER_ITERATIONS}.pkl"
+            ),
+            map_location=device,
             weights_only=True,
         )
     )
@@ -46,13 +76,12 @@ def load_models(
     # Set the model to evaluation mode
     generator.eval()
 
-    discriminator = DCDiscriminator(conv_dim=64)
-    discriminator.to(DEVICE)
-
     discriminator.load_state_dict(
         torch.load(
-            os.path.join(saved_folder_path, f"D_{NUMBER_ITERATIONS}.pkl"),
-            map_location=DEVICE,
+            os.path.join(
+                saved_folder_path, f"D{discriminator_suffix}_{NUMBER_ITERATIONS}.pkl"
+            ),
+            map_location=device,
             weights_only=True,
         )
     )
@@ -64,24 +93,40 @@ def load_models(
 
 def test_discriminator(
     input_type: InputType,
+    model_type: ModelType,
     batch_size: int,
     device: torch.device,
-    generator: DCGenerator,
+    generator: GeneratorType,
     discriminator: DCDiscriminator,
 ) -> np.ndarray:
-    noise = sample_noise(batch_size, 100, device=device)  # # 100 x 100 x 1 x 1
+    if model_type == ModelType.dcgan:
+        noise = sample_noise(batch_size, 100, device=device)  # # 100 x 100 x 1 x 1
 
-    fake_images = generator(noise)
-    fake_disc_outputs = discriminator(fake_images)
+        fake_images = generator(noise)
+        fake_disc_outputs = discriminator(fake_images)
+
+    elif model_type == ModelType.cyclegan and input_type == InputType.Windows:
+        _, gen_dataloader = get_emoji_loader(
+            emoji_type=InputType.Apple, image_size=32, batch_size=batch_size
+        )
+        gen_iter = iter(gen_dataloader)
+
+        gen_images, gen_labels = next(gen_iter)
+        gen_images, gen_labels = (
+            gen_images.to(device),
+            gen_labels.long().squeeze().to(device),
+        )
+        fake_images = generator(gen_images)
+        fake_disc_outputs = discriminator(fake_images)
 
     zeros_tensor = torch.zeros(batch_size, 1, device=device)
     fake_outputs = torch.cat((fake_disc_outputs.unsqueeze(1), zeros_tensor), dim=1)
 
-    _, test_dataloader_X = get_emoji_loader(
+    _, test_dataloader = get_emoji_loader(
         emoji_type=input_type, image_size=32, batch_size=batch_size
     )
 
-    test_iter = iter(test_dataloader_X)
+    test_iter = iter(test_dataloader)
 
     test_images, test_labels = next(test_iter)
     test_images, test_labels = (
@@ -143,23 +188,27 @@ def plot_discriminator_results(results: np.ndarray, saved_folder_path: str) -> N
 if __name__ == "__main__":
     parent_file = Path(__file__).parent
 
-    MODEL_TYPE = "dcgan"
+    MODEL_TYPE = ModelType.cyclegan
     EMOJI_TYPE = InputType.Windows
     LEARNING_RATE = 0.0003
-    NUMBER_ITERATIONS = 5000
+    NUMBER_ITERATIONS = 10000
     BATCH_SIZE = 100
 
     saved_folder_path = str(
         parent_file
-        / f"checkpoints/{MODEL_TYPE}-{EMOJI_TYPE}-lr-{LEARNING_RATE}-train-iter-{NUMBER_ITERATIONS}"
+        / f"checkpoints/{str(MODEL_TYPE.value)}-{EMOJI_TYPE}-lr-{LEARNING_RATE}-train-iter-{NUMBER_ITERATIONS}"
     )
 
     generator, discriminator = load_models(
-        saved_folder_path=saved_folder_path, device=DEVICE
+        input_type=EMOJI_TYPE,
+        model_type=MODEL_TYPE,
+        saved_folder_path=saved_folder_path,
+        device=DEVICE,
     )
 
     results = test_discriminator(
         input_type=EMOJI_TYPE,
+        model_type=MODEL_TYPE,
         batch_size=BATCH_SIZE,
         device=DEVICE,
         generator=generator,
