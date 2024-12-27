@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
-from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 
 import pickle as pkl
@@ -126,20 +125,20 @@ def string_to_index_tensor(
     return torch.LongTensor([char_to_index[char] for char in string] + [end_token])
 
 
-def to_var(tensor: torch.Tensor, cuda: bool) -> Variable:
-    """Wraps a Tensor in a Variable, optionally placing it on the GPU.
+def to_var(tensor: torch.Tensor, cuda: bool) -> torch.Tensor:
+    """Places a tensor on the GPU, if cuda is True.
 
     Arguments:
         tensor: A Tensor object.
         cuda: A boolean flag indicating whether to use the GPU.
 
     Returns:
-        A Variable object, on the GPU if cuda==True.
+        A tensor, on the GPU if cuda==True.
     """
     if cuda:
-        return Variable(tensor.cuda())
+        return tensor.cuda()
     else:
-        return Variable(tensor)
+        return tensor
 
 
 def training_loop(

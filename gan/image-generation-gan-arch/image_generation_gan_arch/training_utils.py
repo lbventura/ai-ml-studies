@@ -99,7 +99,7 @@ def gan_save_samples(
 
 
 def to_data(x: torch.Tensor, device: torch.device) -> np.ndarray:
-    """Converts variable to numpy."""
+    """Converts a tensor to numpy."""
     if device.type == "mps" or device.type == "cuda":
         x = x.cpu()
     return x.data.numpy()

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from rnn_trans_arch.training_utils import to_var
-from torch.autograd import Variable
 
 
 class GRUEncoder(nn.Module):  # type: ignore
@@ -40,7 +39,7 @@ class GRUEncoder(nn.Module):  # type: ignore
         annotations = torch.stack(annotations, dim=1)
         return annotations, hidden
 
-    def init_hidden(self, bs: int) -> Variable:
+    def init_hidden(self, bs: int) -> torch.Tensor:
         """Creates a tensor of zeros to represent the initial hidden states
         of a batch of sequences.
 

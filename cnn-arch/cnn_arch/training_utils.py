@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch.nn.modules.loss import _Loss
 
 
@@ -36,7 +35,7 @@ def get_batch(
 
 def get_torch_vars(
     xs: np.array, ys: np.array, gpu: bool = False
-) -> tuple[Variable, Variable]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Helper function to convert numpy arrays to pytorch tensors.
     If GPU is used, move the tensors to GPU.
@@ -46,14 +45,14 @@ def get_torch_vars(
       ys (int numpy tenosor): categorical labels
       gpu (bool): whether to move pytorch tensor to GPU
     Returns:
-      Variable(xs), Variable(ys)
+      xs, ys
     """
     xs = torch.from_numpy(xs).float()
     ys = torch.from_numpy(ys).long()
     if gpu:
         xs = xs.cuda()
         ys = ys.cuda()
-    return Variable(xs), Variable(ys)
+    return xs, ys
 
 
 def compute_loss(
