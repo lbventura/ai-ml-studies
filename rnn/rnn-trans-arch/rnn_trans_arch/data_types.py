@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+import torch
+
 
 @dataclass
 class TrainingParams:
     data_source: str
-    cuda: bool = False
+    device: torch.device = torch.device(
+        "cpu"
+    )  # default value is cpu because training on gpu is much slower
     nepochs: int = 75
     checkpoint_dir: str = "checkpoints"
     learning_rate: float = 0.005

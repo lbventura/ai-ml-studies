@@ -26,7 +26,7 @@ def translate_sentence(
     encoder: nn.Module,
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    cuda: bool,
+    device: torch.device,
 ) -> str:
     """Translates a sentence by splitting the sentence into
     words (whitespace-separated), running the encoder-decoder model to translate each
@@ -35,7 +35,7 @@ def translate_sentence(
 
     return_string = []
     for word in sentence.split():
-        generated_word, _ = translate(word, encoder, decoder, idx_dict, cuda)
+        generated_word, _ = translate(word, encoder, decoder, idx_dict, device)
         return_string.append(generated_word)  # Translates each word
 
     return " ".join(return_string)
@@ -46,7 +46,7 @@ def translate(
     encoder: nn.Module,
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    cuda: bool,
+    device: torch.device,
 ) -> tuple[str, torch.Tensor]:
     """Translates a given string using the encoder and decoder."""
 
@@ -57,12 +57,12 @@ def translate(
 
     # Represent the input string as a list of indexes and convert it to a tensor
     indexes = string_to_index_tensor(input_string, char_to_index, end_token)
-    indexes = to_var(
-        indexes.unsqueeze(0), cuda
+    indexes = indexes.unsqueeze(0).to(
+        device
     )  # Unsqueeze to make it like batch_size = 1
 
     generated_tensor, attention_weights = run_encoder_decoder(
-        indexes, encoder, decoder, start_token, end_token, cuda
+        indexes, encoder, decoder, start_token, end_token, device
     )
 
     gen_string = "".join(
@@ -82,14 +82,12 @@ def run_encoder_decoder(
     decoder: nn.Module,
     start_token: int,
     end_token: int,
-    cuda: bool,
+    device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     # Encode the input string
     encoder_annotations, encoder_last_hidden = encoder(indexes)
 
-    decoder_input = to_var(
-        torch.LongTensor([[start_token]]), cuda
-    )  # For batch_size = 1
+    decoder_input = torch.LongTensor([[start_token]]).to(device)  # For batch_size = 1
     # Initialize the decoder input with the start token
     decoder_inputs = decoder_input
 
@@ -225,7 +223,11 @@ def training_loop(
 
             if epoch % 5 == 0:  # translate a test sentence every 5 epochs
                 gen_string = translate_sentence(
-                    test_sentence, encoder, decoder, idx_dict, cuda=training_params.cuda
+                    test_sentence,
+                    encoder,
+                    decoder,
+                    idx_dict,
+                    device=training_params.device,
                 )
                 print(
                     "Epoch: {:3d} | Train loss: {:.3f} | Val loss: {:.3f} | Gen: {:20s}".format(
@@ -292,9 +294,11 @@ def compute_loss(
             start = i * training_params.batch_size
             end = start + training_params.batch_size
 
-            inputs = to_var(torch.stack(input_tensors[start:end]), training_params.cuda)
-            targets = to_var(
-                torch.stack(target_tensors[start:end]), training_params.cuda
+            inputs = torch.stack(input_tensors[start:end]).to(
+                training_params.device
+            )  # batch_size x seq_len
+            targets = torch.stack(target_tensors[start:end]).to(
+                training_params.device
             )  # batch_size x seq_len + 1
 
             # The batch size may be different in each epoch
@@ -307,7 +311,7 @@ def compute_loss(
             start_vector = (
                 torch.ones(batch_size).long().unsqueeze(1) * start_token
             )  # batch_size x 1
-            decoder_input = to_var(start_vector, training_params.cuda)  # batch_size x 1
+            decoder_input = start_vector.to(training_params.device)  # batch_size x 1
 
             loss = 0.0
 
@@ -411,7 +415,7 @@ def visualize_attention(
     encoder: nn.Module,
     decoder: nn.Module,
     idx_dict: dict[str, dict[str, int] | dict[int, str] | int],
-    cuda: bool,
+    device: torch.device,
 ) -> str:
     """Generates a heatmap to show where attention is focused in each decoder step."""
     gen_string, attention_weights = translate(
@@ -419,7 +423,7 @@ def visualize_attention(
         encoder=encoder,
         decoder=decoder,
         idx_dict=idx_dict,
-        cuda=cuda,
+        device=device,
     )
 
     if isinstance(attention_weights, tuple):

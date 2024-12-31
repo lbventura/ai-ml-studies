@@ -1,15 +1,14 @@
 import torch
 import torch.nn as nn
-from rnn_trans_arch.training_utils import to_var
 
 
 class GRUEncoder(nn.Module):  # type: ignore
-    def __init__(self, vocab_size: int, hidden_size: int, cuda: bool):
+    def __init__(self, vocab_size: int, hidden_size: int, device: torch.device):
         super(GRUEncoder, self).__init__()
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.cuda_flag = cuda
+        self.device = device
 
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         self.gru = nn.GRUCell(hidden_size, hidden_size)
@@ -49,4 +48,4 @@ class GRUEncoder(nn.Module):  # type: ignore
         Returns:
             hidden: An initial hidden state of all zeros. (batch_size x hidden_size)
         """
-        return to_var(torch.zeros(bs, self.hidden_size), self.cuda_flag)
+        return torch.zeros(bs, self.hidden_size).to(self.device)

@@ -27,6 +27,24 @@ from rnn_trans_arch.training_utils import (
 )
 from pathlib import Path
 
+SEED = 1
+
+# Set the random seed manually for reproducibility.
+torch.manual_seed(SEED)
+
+# Device selection
+if torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
+    print("Using MPS device for acceleration.")
+elif torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+    torch.cuda.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+    print("Using CUDA device for acceleration.")
+else:
+    DEVICE = torch.device("cpu")
+    print("Using CPU device.")
+
 TEST_SENTENCE = "the air conditioning is working"
 
 
@@ -63,7 +81,7 @@ def train(
     encoder = GRUEncoder(
         vocab_size=vocab_size,
         hidden_size=model_params.hidden_size,
-        cuda=training_params.cuda,
+        device=training_params.device,
     )
 
     if model_params.decoder_type == DecoderType.rnn:
@@ -97,9 +115,9 @@ def train(
     if not os.path.exists(training_params.checkpoint_dir):
         os.makedirs(training_params.checkpoint_dir)
 
-    if training_params.cuda:
-        encoder.cuda()
-        decoder.cuda()
+    if training_params.device.type == "cuda" or training_params.device.type == "mps":
+        encoder.to(training_params.device)
+        decoder.to(training_params.device)
         print("Moved models to GPU!")
 
     criterion = nn.CrossEntropyLoss()
@@ -130,10 +148,10 @@ def train(
 
 
 if __name__ == "__main__":
-    torch.manual_seed(1)
-
     data_source = "pig_latin_data.txt"
-    training_params = TrainingParams(data_source=data_source)
+    training_params = TrainingParams(
+        data_source=data_source,
+    )
     model_params = ModelParams()
 
     data_fpath = get_file(
@@ -157,6 +175,6 @@ if __name__ == "__main__":
         rnn_attn_encoder_scaled_dot,
         rnn_attn_decoder_scaled_dot,
         idx_dict,
-        cuda=training_params.cuda,
+        device=training_params.device,
     )
     print("source:\t\t{} \ntranslated:\t{}".format(TEST_SENTENCE, translated))
