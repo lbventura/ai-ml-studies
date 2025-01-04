@@ -10,5 +10,6 @@ rnn/rnn-trans-arch/rnn_trans_arch/__pycache__/
 rnn/rnn-trans-arch/data
 rnn/rnn-trans-arch/output
 rnn/rnn-trans-arch/runs
-rl/cartpole-rl/cartpole_videos
+rl/cartpole-rl/cartpole_run_info
 rl/a2c.py
+rl/cartpole-rl/cartpole_rl/__pycache__/
