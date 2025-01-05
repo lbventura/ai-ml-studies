@@ -9,6 +9,7 @@ from cartpole_rl.data_types import TrainingParams
 def rl_training_loop(
     policy_net: PolicyNet, training_params: TrainingParams, env: Any, monitored_env: Any
 ) -> list[float]:
+    """Training loop for policy gradient algorithm."""
     # Set baseline to 0
     baseline = 0.0
 
@@ -20,7 +21,7 @@ def rl_training_loop(
     # Collect trajectory rewards for plotting purpose
     traj_reward_history = []
 
-    # training loop
+    # training loop , iterate over episodes
     for ep_i in range(training_params.num_episodes):
         loss = 0.0
 
@@ -56,6 +57,7 @@ def rl_training_loop(
                 actions.append(action)
 
                 # take a step in the environment, and collect data
+                # see state details in the README.md file
                 next_state, reward, done, _ = env.step(action)
 
                 # Discount the reward, and append to reward list
@@ -67,6 +69,7 @@ def rl_training_loop(
                 cur_state = convert_to_torch(next_state)
 
                 time_step += 1
+                # the discount factor has a decay
                 discount_factor *= training_params.gamma
 
             # Finished collecting data for the current trajectory.

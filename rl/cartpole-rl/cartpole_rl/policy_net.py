@@ -4,6 +4,8 @@ import torch
 
 
 class PolicyNet(nn.Module):  # type: ignore
+    """A fully connected neural network for policy approximation."""
+
     def __init__(self, input_dim: int, output_dim: int) -> None:
         super(PolicyNet, self).__init__()
 

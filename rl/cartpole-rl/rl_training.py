@@ -27,9 +27,13 @@ if __name__ == "__main__":
     # Define state and action dimensions
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
+    print(f"State dimension: {state_dim}, Action dimension: {action_dim}")
     bernoulli_action_dim = 1
 
     # Initialize policy network
+    # The policy network is a simple neural network that takes the state as input and outputs the probability of taking action 1 (going to the right).
+    # This is then used to sample the action from a Bernoulli distribution.
+    # If, for example, the output of the policy network is 0.7, then the probability of taking action 1 is 0.7.
     policy_net = PolicyNet(input_dim=state_dim, output_dim=bernoulli_action_dim)
 
     # Train the policy network
