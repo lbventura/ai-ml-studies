@@ -22,4 +22,4 @@ It is important to note the return value of `env.step(action)`, where `env=gym.m
 
 As one example, one can create an environment and move the cart to the right to watch the pole tip to the left:
 
-![Example](figures/cartpole-movement.png)
+![Example](cartpole-movement.png)
