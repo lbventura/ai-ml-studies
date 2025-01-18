@@ -1,4 +1,4 @@
-# Convolutional Neural Network Architecture for Image Colorization
+# Convolutional Neural Network (CNN) Architecture for Image Colorization
 
 This is a simple CNN architecture for image colorization based on [assignment 2](http://www.cs.toronto.edu/~rgrosse/courses/csc421_2019/assignments/assignment2.pdf) of the Neural Networks and Deep Learning course of the University of Toronto. See more information in the course page [here](http://www.cs.toronto.edu/~rgrosse/courses/csc421_2019/).
 
@@ -15,3 +15,12 @@ The image on the left (epoch 0) has a much lower color contrast than the image o
 |:---------------------------------------------------------------:|:---------------------------------------------------------------:|
 
 The image on the left is much lighter than the original image. At epoch 24, the image is more colorful and closer to the original image.
+
+## Why are CNNs used for Image Processing and Computer Vision?
+
+A few points:
+
+- The layered structure of CNNs allows them to learn features hierarchically. The earlier layers learn simple features (e.g., edges, texture, basic shapes). The intermediate layers then combine these simple features to learn more complex features (e.g., corners, contours, parts of objects). The final layers capture high-level semantic information (e.g., entire objects, the background, etc..).
+- Compared to a fully connected network, these contain fewer parameters, which makes training computationally more efficient.
+- Also compared to a fully connected network, the nature of the convolution operation causes each unit to be connected to only a small region of the input image. This local connectivity allows the network to learn spatial hierarchies of features, described above.
+- The same network can be used for multiple tasks, as the early layer features are general. In the assignment, the same network is used for image colorization and super-resolution (e.g, improve an image's resolution).
