@@ -20,7 +20,12 @@ The image on the left is much lighter than the original image. At epoch 24, the 
 
 A few points:
 
-- The layered structure of CNNs allows them to learn features hierarchically. The earlier layers learn simple features (e.g., edges, texture, basic shapes). The intermediate layers then combine these simple features to learn more complex features (e.g., corners, contours, parts of objects). The final layers capture high-level semantic information (e.g., entire objects, the background, etc..).
-- Compared to a fully connected network, these contain fewer parameters, which makes training computationally more efficient.
-- Also compared to a fully connected network, the nature of the convolution operation causes each unit to be connected to only a small region of the input image. This local connectivity allows the network to learn spatial hierarchies of features, described above.
-- The same network can be used for multiple tasks, as the early layer features are general. In the assignment, the same network is used for image colorization and super-resolution (e.g, improve an image's resolution).
+- The architecture of CNNs - through the usage of both convolution and pooling layers - enables the hierarchical learning of features. Early layers detect simple elements such as edges, textures, and basic shapes. Intermediate layers combine these basic features to recognize more complex structures like corners, contours, and parts of objects. The deeper layers capture high-level semantic information, including entire objects and backgrounds.
+
+- Compared to fully connected networks, CNNs have significantly fewer parameters. This makes the training process computationally more efficient and reduces the risk of overfitting.
+
+- Convolution operations in CNNs ensure that each neuron is connected only to a small, localized region of the input image. This local connectivity allows the network to learn and preserve spatial hierarchies of features, enhancing its ability to understand spatial relationships within the image.
+
+- (Point on pooling layers: 1. create a hierarchical representation by aggregating over features, 2. prioritize the most important features, 3. introduce translation invariance, which allows feature recognition regardless of its position in the image.)
+
+- The generality of features learned in the early layers allows the same CNN architecture to be applied to multiple tasks. For instance, in this assignment, the network is utilized for both image colorization and super-resolution (e.g., enhancing an image's resolution).
