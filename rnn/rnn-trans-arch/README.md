@@ -8,6 +8,8 @@ The goal is to translate Pig Latin to English. Pig Latin is a language game that
 
 ## Results Summary
 
+The original tutorial does an excellent job at walking the student through the problem by first addressing a set of conceptual questions and then introducing several architectures and their performance. The `resuls.md` file contains a summary of the answers.
+
 ## Architecture
 
 For more details about the architecture, check the `architecture.md` file.
